@@ -43,6 +43,7 @@ export const CWE: Record<string, CweEntry> = Object.fromEntries(
     E('CWE-937', 'Using Components with Known Vulnerabilities', 'A06:2021', 'Upgrade to a fixed version.'),
     E('CWE-347', 'Improper Verification of Cryptographic Signature', 'A07:2021', 'Verify JWTs with jwt.verify and an explicit algorithms list.'),
     E('CWE-287', 'Improper Authentication', 'A07:2021', 'Use a vetted authentication flow.'),
+    E('CWE-295', 'Improper Certificate Validation', 'A07:2021', 'Keep TLS verification on; pin a CA bundle instead of disabling checks.'),
     E('CWE-1321', 'Prototype Pollution', 'A08:2021', 'Use safe merge functions and reject __proto__ / constructor keys.'),
     E('CWE-494', 'Download of Code Without Integrity Check', 'A08:2021', 'Verify checksums/signatures; never pipe curl into sh.'),
     E('CWE-502', 'Deserialization of Untrusted Data', 'A08:2021', 'Do not deserialise untrusted input.'),
