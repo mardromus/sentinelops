@@ -4,7 +4,7 @@
 import { SourceFile } from '../../common/types';
 import { lineHits } from '../../scanners/secrets/secrets.scanner';
 import { normalizeName } from '../../scanners/deps/version';
-import { envName, locate } from '../code';
+import { ensurePyImport, envName, locate } from '../code';
 import { Fixer, FixOutput } from './types';
 
 // ------------------------------------------------------------ dependencies
@@ -147,10 +147,49 @@ export const secretToEnv: Fixer = ({ finding, content, path }): FixOutput | null
   const name = hit.key ? envName(hit.key) : ENV_FOR_RULE[finding.ruleId] || 'APP_SECRET';
   const ref = lang === 'py' ? `os.environ["${name}"]` : `process.env.${name}`;
   lines[idx] = line.slice(0, lit.index) + ref + line.slice(lit.index + lit[0].length);
-  if (lang === 'py' && !/^\s*import os\b/m.test(content)) lines = ['import os', ...lines];
+  if (lang === 'py') lines = ensurePyImport(lines, 'os');
   return {
     content: lines.join('\n'),
     description: `Moved the hard-coded credential out of the source: it is now read from ${name}.`,
     notes: [`Revoke and rotate the exposed value, then set ${name} in the environment or secret manager.`, 'The old value remains in git history.'],
   };
+};
+
+// ------------------------------------------------------------ GitHub Actions
+
+const EVENT_PREFIX: Record<string, string> = { pull_request: 'PR', issue: 'ISSUE', comment: 'COMMENT', review: 'REVIEW', head_commit: 'COMMIT' };
+
+/**
+ * run: echo "${{ github.event.pull_request.title }}"
+ *   ->
+ * run: echo "$PR_TITLE"
+ * env:
+ *   PR_TITLE: ${{ github.event.pull_request.title }}
+ * The value reaches the script as data in an environment variable instead of being pasted into its source.
+ */
+export const ghaEnvIndirection: Fixer = ({ finding, content }) => {
+  const lines = content.split('\n');
+  const idx = locate(lines, finding);
+  if (idx < 0) return null;
+  const line = lines[idx];
+  const run = /^(\s*)(-\s*)?run\s*:\s*(?![|>])/.exec(line);
+  if (!run) return null; // multi-line run blocks are left to a human
+  const keyIndent = run[1].length + (run[2] ? run[2].length : 0);
+  // the step must not already declare env (we would need to merge)
+  for (let i = idx + 1; i < lines.length; i++) {
+    const ind = /^(\s*)/.exec(lines[i])![1].length;
+    if (lines[i].trim() === '') continue;
+    if (ind < keyIndent || (ind === keyIndent && /^\s*-/.test(lines[i]))) break;
+    if (ind === keyIndent && /^\s*env\s*:/.test(lines[i])) return null;
+  }
+  const vars: [string, string][] = [];
+  const next = line.replace(/\$\{\{\s*(github\.(?:event\.(\w+)\.[\w.]+|head_ref))\s*\}\}/g, (_m, expr: string, scope?: string) => {
+    const name = scope ? `${EVENT_PREFIX[scope] || scope.toUpperCase()}_${expr.split('.').pop()!.toUpperCase()}` : 'HEAD_REF';
+    if (!vars.some(([n]) => n === name)) vars.push([name, expr]);
+    return `$${name}`;
+  });
+  if (!vars.length) return null;
+  const pad = ' '.repeat(keyIndent);
+  lines.splice(idx, 1, next, `${pad}env:`, ...vars.map(([n, e]) => `${pad}  ${n}: \${{ ${e} }}`));
+  return { content: lines.join('\n'), description: `Pass ${vars.map(([n]) => n).join(', ')} to the script through env instead of interpolating it into the shell source.` };
 };

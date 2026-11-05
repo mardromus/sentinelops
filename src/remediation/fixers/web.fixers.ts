@@ -2,7 +2,7 @@
  * Fixers for web-layer findings: XSS, redirects, SSRF, path traversal,
  * CORS, cookies, security headers, JWT verification and crypto choices.
  */
-import { ensureHelper, ensureImport, locate, matchParen } from '../code';
+import { ensureHelper, ensureImport, ensurePyImport, locate, matchParen } from '../code';
 import { Fixer, FixOutput, isTs } from './types';
 
 /**
@@ -224,8 +224,32 @@ export const yamlSafeLoad: Fixer = ({ finding, content }) => {
 };
 
 export const flaskDebug: Fixer = ({ finding, content }) => {
-  let lines = edit(content, finding, (line) => line.replace(/debug\s*=\s*True/, 'debug=os.environ.get("FLASK_DEBUG") == "1"'));
+  const lines = edit(content, finding, (line) => line.replace(/debug\s*=\s*True/, 'debug=os.environ.get("FLASK_DEBUG") == "1"'));
   if (!lines) return null;
-  if (!/^\s*import os\b|^\s*from os import/m.test(lines.join('\n'))) lines = ['import os', ...lines];
-  return { content: lines.join('\n'), description: 'Debug mode is now opt-in through FLASK_DEBUG=1 instead of always on.' };
+  return { content: ensurePyImport(lines, 'os').join('\n'), description: 'Debug mode is now opt-in through FLASK_DEBUG=1 instead of always on.' };
+};
+
+/** _.merge({}, req.body) -> _.merge({}, withoutProtoKeys(req.body)) */
+export const stripProtoKeys: Fixer = ({ finding, content, path }) => {
+  const lines = edit(content, finding, (line) => line.replace(/(,\s*)(req(?:uest)?\.(?:body|query)(?:\.[\w$]+)*)/, '$1withoutProtoKeys($2)'));
+  if (!lines) return null;
+  const sig = isTs(path) ? 'function withoutProtoKeys<T>(value: T): T' : 'function withoutProtoKeys(value)';
+  const out = ensureHelper(
+    lines,
+    'withoutProtoKeys',
+    `// Deep copy of client JSON without "__proto__" / "constructor" / "prototype" keys (added by SentinelOps)
+${sig} {
+  return JSON.parse(JSON.stringify(value ?? {}), (key, v) => (key === '__proto__' || key === 'constructor' || key === 'prototype' ? undefined : v));
+}`,
+  );
+  return { content: out.join('\n'), description: 'Strip prototype-polluting keys from client input before the deep merge.' };
+};
+
+/** res.status(500).send(err.stack) -> res.status(500).send('Internal Server Error') */
+export const genericError: Fixer = ({ finding, content }) => {
+  const lines = edit(content, finding, (line) =>
+    line.replace(/(res\.(?:status\(\d+\)\.)?(?:send|json)\s*\(\s*)(err|error|e)(\.stack|\.message)?(\s*\))/, (_m, pre: string, _v: string, _p: string, post: string) => `${pre}${/json\s*\($/.test(pre) ? "{ error: 'Internal Server Error' }" : "'Internal Server Error'"}${post}`),
+  );
+  if (!lines) return null;
+  return { content: lines.join('\n'), description: 'Clients get a generic error message instead of the stack trace / internal error text.', notes: ['Log the error server-side (with a request id) so it can still be debugged.'] };
 };

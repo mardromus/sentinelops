@@ -8,8 +8,9 @@ import { verifyFix } from './verify';
 
 export interface ApplyResult {
   applied: FixProposal[];
+  resolved: { findingId: string; by: string }[]; // fixed as a side effect of an earlier fix in the same run
   skipped: { findingId: string; reason: string }[];
-  files: { path: string; diff: string }[];
+  files: { path: string; diff: string; content: string }[];
 }
 
 /** Reads/writes files relative to a scan root; swappable in tests and for PR branches. */
@@ -68,13 +69,26 @@ export class RemediationService {
     return n;
   }
 
+  /** Did an earlier fix in this run already remove this finding? Returns the id of that fix. */
+  private async resolvedBy(f: Finding, file: string, original: string, current: string, applied: FixProposal[]): Promise<string | null> {
+    const earlier = applied.filter((p) => p.file === file);
+    if (!earlier.length) return null;
+    if (f.category === 'dependency' && f.package?.fixedIn) {
+      const want = f.package.fixedIn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pinned = new RegExp(`"${f.package.name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}"\\s*:\\s*"\\^?${want}"|^${f.package.name}==${want}\\b`, 'mi');
+      return pinned.test(current) ? earlier[earlier.length - 1].findingId : null;
+    }
+    const v = await verifyFix(f, file, original, current);
+    return v.ok ? earlier[earlier.length - 1].findingId : null;
+  }
+
   /**
    * Apply fixes for the selected findings. Fixes for the same file are
    * applied one after another on the evolving content (each fixer re-locates
    * its line), and only verified fixes are kept unless `allowUnverified`.
    */
   async apply(findings: Finding[], ws: Workspace, opts: { allowUnverified?: boolean; dryRun?: boolean } = {}): Promise<ApplyResult> {
-    const res: ApplyResult = { applied: [], skipped: [], files: [] };
+    const res: ApplyResult = { applied: [], resolved: [], skipped: [], files: [] };
     const original = new Map<string, string>();
     const current = new Map<string, string>();
     const moves = new Map<string, ((line: number) => number)[]>(); // line maps of fixes already applied per file
@@ -99,7 +113,9 @@ export class RemediationService {
       const prev = current.get(target.file)!;
       const p = await this.propose(located, ws, prev);
       if (!p) {
-        res.skipped.push({ findingId: f.id, reason: 'already fixed or line shape not recognised' });
+        const by = prev !== original.get(target.file) ? await this.resolvedBy(located, target.file, original.get(target.file)!, prev, res.applied) : null;
+        if (by) res.resolved.push({ findingId: f.id, by });
+        else res.skipped.push({ findingId: f.id, reason: 'no fix for this exact code shape; needs a manual change' });
         continue;
       }
       if (!p.verified && !opts.allowUnverified) {
@@ -116,7 +132,7 @@ export class RemediationService {
       const before = original.get(path)!;
       if (content === before) continue;
       if (!opts.dryRun) ws.write(path, content);
-      res.files.push({ path, diff: unifiedDiff(path, before, content) });
+      res.files.push({ path, diff: unifiedDiff(path, before, content), content });
     }
     return res;
   }

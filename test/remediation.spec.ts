@@ -157,7 +157,8 @@ describe('supply-chain fixers', () => {
     expect(doc.dependencies).toEqual({ lodash: '^4.17.21', express: '^4.19.2' });
     expect(doc.overrides).toEqual({ minimist: '^1.2.6' });
     expect(res.files.map((f) => f.path)).toEqual(['package.json']);
-    expect(res.skipped.map((s) => s.reason)).toEqual(['already fixed or line shape not recognised']); // second lodash advisory
+    expect(res.skipped).toEqual([]);
+    expect(res.resolved).toHaveLength(1); // the second lodash advisory is fixed by the same bump
   });
 
   it('pins requirements and hardens Dockerfiles / manifests', async () => {
@@ -176,5 +177,84 @@ describe('supply-chain fixers', () => {
     expect(ws.files.Dockerfile).toContain('USER node\nCMD');
     expect(ws.files.Dockerfile).not.toContain('abcd1234efgh');
     expect(ws.files['k8s/pod.yaml']).toContain('privileged: false');
+  });
+});
+
+describe('more fixers', () => {
+  const svc = new RemediationService();
+
+  it('rewrites multi-line exec callbacks and quoted SQL concatenation', async () => {
+    const src = [
+      "const { exec } = require('child_process');",
+      "router.post('/t', (req, res) => {",
+      '  exec(`convert ${req.body.image} -resize 200x200 thumb.png`, (err) => {',
+      '    if (err) return res.status(500).send(err.message);',
+      '  });',
+      "  db.query(\"UPDATE users SET token = '\" + tok + \"' WHERE email = '\" + req.body.email + \"'\", () => res.json({}));",
+      '});',
+      '',
+    ].join('\n');
+    const fs = await findingsFor(new SastScanner(), 'src/r.js', src);
+    expect(fs.map((f) => f.ruleId).sort()).toEqual(['js.cmdi.shell-command-from-input', 'js.error.stack-trace-exposed', 'js.sqli.string-built-query']);
+    const ws = memoryWorkspace({ 'src/r.js': src });
+    const res = await svc.apply(fs, ws);
+    expect(res.skipped).toEqual([]);
+    const out = ws.files['src/r.js'];
+    expect(out).toContain("execFile('convert', [req.body.image, '-resize', '200x200', 'thumb.png'], (err) => {");
+    expect(out).toContain('db.query("UPDATE users SET token = ? WHERE email = ?", [tok, req.body.email], () => res.json({}));');
+    expect(out).toContain("res.status(500).send('Internal Server Error')");
+  });
+
+  it('strips prototype keys before deep merges', async () => {
+    const src = "app.post('/p', (req, res) => res.json(_.merge({}, req.body)));\n";
+    const fs = await findingsFor(new SastScanner(), 'a.js', src);
+    const ws = memoryWorkspace({ 'a.js': src });
+    await svc.apply(fs, ws);
+    expect(ws.files['a.js']).toContain('_.merge({}, withoutProtoKeys(req.body))');
+    const helper = new Function(ws.files['a.js'].split('\n').slice(2).join('\n') + '; return withoutProtoKeys;')();
+    const clean = helper(JSON.parse('{"a":1,"__proto__":{"admin":true},"b":{"constructor":{"x":1}}}'));
+    expect(Object.keys(clean)).toEqual(['a', 'b']);
+    expect(({} as any).admin).toBeUndefined();
+  });
+
+  it('turns shell=True into an argument list', async () => {
+    const src = 'import subprocess\nsubprocess.run(f"tar czf /tmp/{name}.tgz /var/reports", shell=True, check=True)\n';
+    const fs = await findingsFor(new SastScanner(), 'w.py', src);
+    const ws = memoryWorkspace({ 'w.py': src });
+    const res = await svc.apply(fs, ws);
+    expect(res.applied).toHaveLength(1);
+    expect(ws.files['w.py']).toContain('subprocess.run(["tar", "czf", f"/tmp/{name}.tgz", "/var/reports"], check=True)');
+  });
+
+  it('moves untrusted workflow expressions into env', async () => {
+    const wf = [
+      'on: pull_request',
+      'jobs:',
+      '  build:',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - run: echo "Building ${{ github.event.pull_request.title }} from ${{ github.head_ref }}"',
+      '      - run: |',
+      '          echo "${{ github.event.issue.body }}"',
+      '        env:',
+      '          SAFE: ${{ github.event.issue.body }}',
+      '',
+    ].join('\n');
+    const fs = await findingsFor(new ConfigScanner(), '.github/workflows/ci.yml', wf);
+    expect(fs.map((f) => f.location.line)).toEqual([6, 8]); // env: values are data, not script
+    const ws = memoryWorkspace({ '.github/workflows/ci.yml': wf });
+    const res = await svc.apply(fs, ws);
+    expect(res.applied).toHaveLength(1); // the multi-line block is left to a human
+    expect(ws.files['.github/workflows/ci.yml']).toContain(
+      ['      - run: echo "Building $PR_TITLE from $HEAD_REF"', '        env:', '          PR_TITLE: ${{ github.event.pull_request.title }}', '          HEAD_REF: ${{ github.head_ref }}'].join('\n'),
+    );
+  });
+
+  it('keeps python header comments above inserted imports', async () => {
+    const src = '# service header\n# second line\nimport sqlite3\napp.run(debug=True)\n';
+    const fs = await findingsFor(new SastScanner(), 's.py', src);
+    const ws = memoryWorkspace({ 's.py': src });
+    await svc.apply(fs, ws);
+    expect(ws.files['s.py'].split('\n').slice(0, 4)).toEqual(['# service header', '# second line', 'import os', 'import sqlite3']);
   });
 });

@@ -1,18 +1,20 @@
 import { Finding } from '../../common/types';
 import { RULES } from '../../scanners/sast/rules';
-import { evalToJsonParse, execToExecFile, pySqlParameterize, sqlParameterize } from './injection.fixers';
-import { dependencyBump, dockerNonRoot, dockerSecretEnv, manifestFor, secretToEnv, yamlHarden } from './supply.fixers';
+import { evalToJsonParse, execToExecFile, pyShellToList, pySqlParameterize, sqlParameterize } from './injection.fixers';
+import { dependencyBump, dockerNonRoot, dockerSecretEnv, ghaEnvIndirection, manifestFor, secretToEnv, yamlHarden } from './supply.fixers';
 import { Fixer } from './types';
 import {
   addHelmet,
   cookieFlags,
   corsAllowlist,
   flaskDebug,
+  genericError,
   jwtVerify,
   pathBasename,
   safeRedirect,
   secureRandom,
   ssrfAllowlist,
+  stripProtoKeys,
   tlsVerify,
   weakHash,
   xssEscape,
@@ -23,6 +25,7 @@ export const FIXERS: Record<string, Fixer> = {
   'sql-parameterize': sqlParameterize,
   'py-sql-parameterize': pySqlParameterize,
   'exec-to-execfile': execToExecFile,
+  'py-shell-to-list': pyShellToList,
   'eval-to-json-parse': evalToJsonParse,
   'xss-escape': xssEscape,
   'safe-redirect': safeRedirect,
@@ -37,6 +40,9 @@ export const FIXERS: Record<string, Fixer> = {
   'tls-verify': tlsVerify,
   'yaml-safe-load': yamlSafeLoad,
   'flask-debug': flaskDebug,
+  'strip-proto-keys': stripProtoKeys,
+  'generic-error': genericError,
+  'gha-env-indirection': ghaEnvIndirection,
   'dependency-bump': dependencyBump,
   'docker-non-root': dockerNonRoot,
   'docker-secret-env': dockerSecretEnv,
@@ -51,6 +57,7 @@ const CONFIG_FIXER: Record<string, string> = {
   'config.container.privileged': 'yaml-harden',
   'config.k8s.privilege-escalation': 'yaml-harden',
   'config.k8s.runs-as-root': 'yaml-harden',
+  'config.gha.script-injection': 'gha-env-indirection',
 };
 
 /** Which fixer handles a finding, and which file it edits. */

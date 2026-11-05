@@ -45,6 +45,42 @@ export function matchParen(s: string, open: number): number {
   return -1;
 }
 
+/**
+ * End of the first call argument after the "(" at `open`: the index of the
+ * top-level "," or ")" that ends it. Works when the rest of the call (for
+ * example a multi-line callback) continues on later lines.
+ */
+export function firstArgEnd(s: string, open: number): { end: number; closed: boolean } | null {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = open + 1; i < s.length; i++) {
+    const c = s[i];
+    if (quote) {
+      if (c === '\\') i++;
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') quote = c;
+    else if ('([{'.includes(c)) depth++;
+    else if (')]}'.includes(c)) {
+      if (depth === 0) return { end: i, closed: true };
+      depth--;
+    } else if (c === ',' && depth === 0) return { end: i, closed: false };
+  }
+  return null;
+}
+
+/** Add "import <mod>" to a Python file, below any header comments / docstring, above the first import. */
+export function ensurePyImport(lines: string[], mod: string): string[] {
+  if (lines.some((l) => new RegExp(`^\\s*import\\s+([\\w.]+\\s*,\\s*)*${mod}\\b|^\\s*from\\s+${mod}\\s+import`).test(l))) return lines;
+  let at = lines.findIndex((l) => /^\s*(import|from)\s+\w/.test(l));
+  if (at < 0) {
+    at = 0;
+    while (at < lines.length && (/^\s*#/.test(lines[at]) || lines[at].trim() === '')) at++;
+  }
+  return [...lines.slice(0, at), `import ${mod}`, ...lines.slice(at)];
+}
+
 /** Split on a separator at nesting depth 0 (outside strings/brackets). */
 export function splitTopLevel(s: string, sep: string): string[] {
   const out: string[] = [];
