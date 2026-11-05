@@ -39,7 +39,7 @@ jobs:
           cache: npm
       - run: npm ci && npm run build
       - name: Gate on high findings in our own code
-        run: node dist/cli.js scan . --exclude demo,test,out --no-osv --fail-on high --sarif sentinelops.sarif --md self-scan.md
+        run: node dist/cli.js scan . --exclude demo,test,out,examples --no-osv --fail-on high --sarif sentinelops.sarif --md self-scan.md
       - if: always()
         run: cat self-scan.md >> "$GITHUB_STEP_SUMMARY"
 

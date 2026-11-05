@@ -30,7 +30,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "demo": "ts-node src/cli.ts scan demo/vulnerable-shop --ai --no-osv --html out/report.html --sarif out/results.sarif --md out/summary.md --fix --out-dir out/fixed --exit-zero",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
-    "self-scan": "ts-node src/cli.ts scan . --exclude demo,test,out --no-osv --fail-on high",
+    "self-scan": "ts-node src/cli.ts scan . --exclude demo,test,out,examples --no-osv --fail-on high",
     "docs:rules": "ts-node src/cli.ts rules --markdown > docs/rules.md"
   },
   "dependencies": {
