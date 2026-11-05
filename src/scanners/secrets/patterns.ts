@@ -25,16 +25,31 @@ export const PROVIDER_PATTERNS: SecretPattern[] = [
     re: /aws.{0,20}secret.{0,20}['"]([A-Za-z0-9/+=]{40})['"]/i,
     minEntropy: 4,
   },
-  { id: 'secret.github-token', title: 'GitHub token', severity: 'critical', re: /\b((?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{60,})\b/ },
+  {
+    id: 'secret.github-token',
+    title: 'GitHub token',
+    severity: 'critical',
+    re: /\b((?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{60,})\b/,
+  },
   { id: 'secret.gitlab-token', title: 'GitLab personal access token', severity: 'critical', re: /\b(glpat-[A-Za-z0-9_-]{20})\b/ },
   { id: 'secret.slack-token', title: 'Slack token', severity: 'high', re: /\b(xox[baprs]-[A-Za-z0-9-]{10,})\b/ },
-  { id: 'secret.slack-webhook', title: 'Slack webhook URL', severity: 'medium', re: /(https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]+)/ },
+  {
+    id: 'secret.slack-webhook',
+    title: 'Slack webhook URL',
+    severity: 'medium',
+    re: /(https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]+)/,
+  },
   { id: 'secret.stripe-live-key', title: 'Stripe live secret key', severity: 'critical', re: /\b((?:sk|rk)_live_[A-Za-z0-9]{20,})\b/ },
   { id: 'secret.google-api-key', title: 'Google API key', severity: 'high', re: /\b(AIza[0-9A-Za-z_-]{35})\b/ },
   { id: 'secret.openai-key', title: 'OpenAI API key', severity: 'high', re: /\b(sk-(?:proj-)?[A-Za-z0-9_-]{32,})\b/ },
   { id: 'secret.sendgrid-key', title: 'SendGrid API key', severity: 'high', re: /\b(SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43})\b/ },
   { id: 'secret.npm-token', title: 'npm access token', severity: 'high', re: /\b(npm_[A-Za-z0-9]{36})\b/ },
-  { id: 'secret.private-key', title: 'Private key block', severity: 'critical', re: /(-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY(?: BLOCK)?-----)/ },
+  {
+    id: 'secret.private-key',
+    title: 'Private key block',
+    severity: 'critical',
+    re: /(-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY(?: BLOCK)?-----)/,
+  },
   {
     id: 'secret.connection-string',
     title: 'Credentials in connection string',
@@ -59,7 +74,8 @@ export const GENERIC_PATTERN: SecretPattern = {
 
 /** KEY=value lines in .env files. */
 export const ENV_LINE = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*['"]?([^'"#\s]+)['"]?/;
-export const SECRETISH_KEY = /(password|passwd|pwd|secret|token|api_?key|access_?key|private_?key|client_?secret|credentials?|dsn|database_url)/i;
+export const SECRETISH_KEY =
+  /(password|passwd|pwd|secret|token|api_?key|access_?key|private_?key|client_?secret|credentials?|dsn|database_url)/i;
 
 const PLACEHOLDER = [
   /^(x+|\*+|\.+|-+|_+|0+|1234\w*|abc\w*)$/i,

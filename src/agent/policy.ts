@@ -17,7 +17,8 @@ import { compareVersions } from '../scanners/deps/version';
 import { diffStats } from '../remediation/diff';
 import { Finding, FixProposal } from '../common/types';
 
-export type AgentAction = 'read' | 'verdict' | 'comment' | 'suggest_fix' | 'commit_fix' | 'open_pr' | 'suppress' | 'merge' | 'push_default_branch';
+export type AgentAction =
+  'read' | 'verdict' | 'comment' | 'suggest_fix' | 'commit_fix' | 'open_pr' | 'suppress' | 'merge' | 'push_default_branch';
 
 export interface Decision {
   allowed: boolean;
@@ -45,7 +46,10 @@ export function isLowRiskFix(fix: FixProposal, finding?: Finding): { low: boolea
   if (fix.strategy === 'ai') return { low: false, why: 'AI-written patches need human review' };
   if (fix.strategy === 'dependency' && finding?.package?.fixedIn) {
     const major = (v: string) => v.replace(/^[^\d]*/, '').split('.')[0];
-    if (major(finding.package.version) !== major(finding.package.fixedIn) && compareVersions(finding.package.fixedIn, finding.package.version) > 0)
+    if (
+      major(finding.package.version) !== major(finding.package.fixedIn) &&
+      compareVersions(finding.package.fixedIn, finding.package.version) > 0
+    )
       return { low: false, why: `major version change ${finding.package.version} -> ${finding.package.fixedIn}` };
     return { low: true, why: 'same-major dependency upgrade outside the affected range' };
   }

@@ -1,4 +1,15 @@
-import { Controller, Headers, HttpCode, Inject, Post, RawBodyRequest, Req, Res, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Headers,
+  HttpCode,
+  Inject,
+  Post,
+  RawBodyRequest,
+  Req,
+  Res,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { verifySignature } from './github.service';
@@ -21,7 +32,8 @@ export class WebhookController {
     @Headers('x-hub-signature-256') signature: string,
   ) {
     if (!this.config.github.webhookSecret) throw new ServiceUnavailableException('GITHUB_WEBHOOK_SECRET is not configured');
-    if (!req.rawBody || !verifySignature(this.config.github.webhookSecret, req.rawBody, signature)) throw new UnauthorizedException('invalid webhook signature');
+    if (!req.rawBody || !verifySignature(this.config.github.webhookSecret, req.rawBody, signature))
+      throw new UnauthorizedException('invalid webhook signature');
     const out = this.webhooks.handle(String(event || ''), req.body);
     res.status(out.status);
     return out.body;

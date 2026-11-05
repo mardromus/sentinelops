@@ -39,7 +39,8 @@ export interface AgentSession {
 export const TOOL_SPECS: ToolSpec[] = [
   {
     name: 'list_findings',
-    description: 'List active findings, highest risk first. Returns id, priority, severity, rule, location, title and whether a deterministic fix exists.',
+    description:
+      'List active findings, highest risk first. Returns id, priority, severity, rule, location, title and whether a deterministic fix exists.',
     parameters: {
       type: 'object',
       properties: {
@@ -65,8 +66,13 @@ export const TOOL_SPECS: ToolSpec[] = [
   },
   {
     name: 'search_code',
-    description: 'Case-sensitive literal search across the repository. Use it to check whether a value is validated or sanitised elsewhere.',
-    parameters: { type: 'object', properties: { query: { type: 'string', minLength: 2 }, max_results: { type: 'integer', minimum: 1, maximum: 50 } }, required: ['query'] },
+    description:
+      'Case-sensitive literal search across the repository. Use it to check whether a value is validated or sanitised elsewhere.',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string', minLength: 2 }, max_results: { type: 'integer', minimum: 1, maximum: 50 } },
+      required: ['query'],
+    },
   },
   {
     name: 'propose_fix',
@@ -154,7 +160,8 @@ export function guardVerdict(s: AgentSession, f: Finding, v: Verdict): Verdict {
   if (injected) why = `prompt-injection text (${injected.labels.join(', ')}) found in ${f.location.file}`;
   else if (f.confidence === 'high' && TAINTED.test(f.message)) why = 'high-confidence finding with request input reaching the sink';
   else if (f.category === 'secret' && f.confidence === 'high') why = 'provider-format credential';
-  else if (f.category === 'dependency' && f.confidence === 'high' && !f.package?.dev) why = 'installed version is inside a published advisory range';
+  else if (f.category === 'dependency' && f.confidence === 'high' && !f.package?.dev)
+    why = 'installed version is inside a published advisory range';
   return why ? { ...v, status: 'needs_review', guardrail: `dismissal blocked: ${why}` } : v;
 }
 
@@ -244,7 +251,8 @@ const IMPL: Record<string, Impl> = {
         continue;
       }
       f.lines.forEach((l, i) => {
-        if (hits.length < Math.min(50, Number(a.max_results) || 20) && l.includes(q)) hits.push(`${f.path}:${i + 1}: ${l.trim().slice(0, 200)}`);
+        if (hits.length < Math.min(50, Number(a.max_results) || 20) && l.includes(q))
+          hits.push(`${f.path}:${i + 1}: ${l.trim().slice(0, 200)}`);
       });
     }
     const text = hits.join('\n') || '(no matches)';
@@ -270,7 +278,8 @@ const IMPL: Record<string, Impl> = {
     const start = Number(a.start_line);
     const end = Number(a.end_line);
     if (!(start >= 1 && end >= start && end <= lines.length)) throw new Error('invalid line range');
-    if (Math.abs(start - f.location.line) > 15 || Math.abs(end - f.location.line) > 15) throw new Error('patch must stay within 15 lines of the finding');
+    if (Math.abs(start - f.location.line) > 15 || Math.abs(end - f.location.line) > 15)
+      throw new Error('patch must stay within 15 lines of the finding');
     const replacement = String(a.replacement ?? '').replace(/\r\n/g, '\n');
     if (replacement.split('\n').length > 40) throw new Error('patch too large (max 40 lines)');
     const after = [...lines.slice(0, start - 1), ...replacement.split('\n'), ...lines.slice(end)].join('\n');
@@ -291,7 +300,9 @@ const IMPL: Record<string, Impl> = {
 
   set_verdict: (s, a) => {
     const f = findingOrThrow(s, a.id);
-    const status = (['true_positive', 'likely_false_positive', 'needs_review'].includes(a.status) ? a.status : 'needs_review') as VerdictStatus;
+    const status = (
+      ['true_positive', 'likely_false_positive', 'needs_review'].includes(a.status) ? a.status : 'needs_review'
+    ) as VerdictStatus;
     const confidence = (['high', 'medium', 'low'].includes(a.confidence) ? a.confidence : 'medium') as Verdict['confidence'];
     const v = guardVerdict(s, f, { status, confidence, rationale: String(a.rationale || '').slice(0, 500), by: 'llm' });
     s.verdicts.set(f.id, v);

@@ -16,7 +16,15 @@ const f = (over: Partial<Parameters<typeof makeFinding>[0]> & { file?: string; l
     package: over.package,
   });
 
-const result = (findings: Finding[]): ScanResult => ({ id: 'r', root: '/nonexistent', startedAt: '', finishedAt: '', filesScanned: 1, findings, scanners: [] });
+const result = (findings: Finding[]): ScanResult => ({
+  id: 'r',
+  root: '/nonexistent',
+  startedAt: '',
+  finishedAt: '',
+  filesScanned: 1,
+  findings,
+  scanners: [],
+});
 
 describe('triage', () => {
   it('scores with explainable adjustments', () => {
@@ -29,7 +37,12 @@ describe('triage', () => {
     expect(inTests.notes.join()).toContain('test/example');
 
     const devDep = scoreFinding(
-      f({ category: 'dependency', severity: 'critical', file: 'package-lock.json', package: { name: 'minimist', version: '1.2.5', ecosystem: 'npm', dev: true, fixedIn: '1.2.6' } }),
+      f({
+        category: 'dependency',
+        severity: 'critical',
+        file: 'package-lock.json',
+        package: { name: 'minimist', version: '1.2.5', ecosystem: 'npm', dev: true, fixedIn: '1.2.6' },
+      }),
     );
     expect(devDep.risk).toBe(70);
   });
@@ -46,7 +59,9 @@ describe('triage', () => {
     expect(r.findings.map((x) => x.ruleId)).toEqual(['b', 'a']);
     expect(r.findings[1].suppressReason).toBe('baseline: accepted risk JIRA-12');
 
-    const expired = svc.triage(result([f({ ruleId: 'c' })]), { baseline: [{ fingerprint: f({ ruleId: 'c' }).fingerprint, reason: 'tmp', until: '2020-01-01' }] });
+    const expired = svc.triage(result([f({ ruleId: 'c' })]), {
+      baseline: [{ fingerprint: f({ ruleId: 'c' }).fingerprint, reason: 'tmp', until: '2020-01-01' }],
+    });
     expect(expired.findings[0].suppressed).toBeFalsy();
   });
 

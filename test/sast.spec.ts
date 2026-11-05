@@ -59,8 +59,8 @@ describe('builtin SAST rules', () => {
     const fs = await scan(
       'server.js',
       [
-        "const app = express();",
-        "app.use(cors());",
+        'const app = express();',
+        'app.use(cors());',
         "const h = crypto.createHash('md5').update(pw).digest('hex');",
         'const resetToken = Math.random().toString(36).slice(2);',
         'const payload = jwt.decode(token);',
@@ -83,7 +83,7 @@ describe('builtin SAST rules', () => {
       'safe.js',
       [
         '// db.query("SELECT * FROM t WHERE a = " + b)',
-        "const app = express(); app.use(helmet());",
+        'const app = express(); app.use(helmet());',
         'res.sendFile(path.basename(req.params.name), { root: PUBLIC });',
         'eval("2 + 2");',
         'const p = jwt.decode(token); // sentinelops-ignore: only reading the header',

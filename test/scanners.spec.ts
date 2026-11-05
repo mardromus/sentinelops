@@ -18,7 +18,12 @@ describe('external adapters', () => {
             path: '/repo/src/db.js',
             start: { line: 12 },
             end: { line: 12 },
-            extra: { severity: 'ERROR', message: 'Tainted SQL', lines: 'db.query(q)', metadata: { cwe: ['CWE-89: SQL Injection'], owasp: ['A03:2021 - Injection'] } },
+            extra: {
+              severity: 'ERROR',
+              message: 'Tainted SQL',
+              lines: 'db.query(q)',
+              metadata: { cwe: ['CWE-89: SQL Injection'], owasp: ['A03:2021 - Injection'] },
+            },
           },
         ],
       }),
@@ -29,7 +34,19 @@ describe('external adapters', () => {
   });
 
   it('parses gitleaks and masks the secret', () => {
-    const fs = parseGitleaks(JSON.stringify([{ RuleID: 'generic-api-key', Description: 'Generic API Key', File: 'a.js', StartLine: 3, Match: 'key = "abc123secret"', Secret: 'abc123secret', Commit: 'deadbeefcafe' }]));
+    const fs = parseGitleaks(
+      JSON.stringify([
+        {
+          RuleID: 'generic-api-key',
+          Description: 'Generic API Key',
+          File: 'a.js',
+          StartLine: 3,
+          Match: 'key = "abc123secret"',
+          Secret: 'abc123secret',
+          Commit: 'deadbeefcafe',
+        },
+      ]),
+    );
     expect(fs[0].location.snippet).toBe('key = "****"');
     expect(fs[0].message).toContain('deadbeef');
   });
@@ -38,8 +55,24 @@ describe('external adapters', () => {
     const fs = parseTrivy(
       JSON.stringify({
         Results: [
-          { Target: 'package-lock.json', Type: 'npm', Vulnerabilities: [{ VulnerabilityID: 'CVE-2021-23337', PkgName: 'lodash', InstalledVersion: '4.17.15', FixedVersion: '4.17.21', Severity: 'HIGH', CweIDs: ['CWE-94'] }] },
-          { Target: 'Dockerfile', Misconfigurations: [{ ID: 'DS002', Title: 'Image user should not be root', Severity: 'HIGH', CauseMetadata: { StartLine: 1 } }] },
+          {
+            Target: 'package-lock.json',
+            Type: 'npm',
+            Vulnerabilities: [
+              {
+                VulnerabilityID: 'CVE-2021-23337',
+                PkgName: 'lodash',
+                InstalledVersion: '4.17.15',
+                FixedVersion: '4.17.21',
+                Severity: 'HIGH',
+                CweIDs: ['CWE-94'],
+              },
+            ],
+          },
+          {
+            Target: 'Dockerfile',
+            Misconfigurations: [{ ID: 'DS002', Title: 'Image user should not be root', Severity: 'HIGH', CauseMetadata: { StartLine: 1 } }],
+          },
         ],
       }),
     );
@@ -68,7 +101,15 @@ describe('orchestration', () => {
 
   it('gives identical vulnerable lines in one file distinct identities', () => {
     const mk = (line: number) =>
-      makeFinding({ ...base, location: { file: 'a.js', line, snippet: 'same()' }, ruleId: 'r', category: 'sast', severity: 'high', cwe: ['CWE-89'], scanner: 'builtin-sast' });
+      makeFinding({
+        ...base,
+        location: { file: 'a.js', line, snippet: 'same()' },
+        ruleId: 'r',
+        category: 'sast',
+        severity: 'high',
+        cwe: ['CWE-89'],
+        scanner: 'builtin-sast',
+      });
     const out = disambiguate([mk(9), mk(3)]);
     expect(new Set(out.map((f) => f.fingerprint)).size).toBe(2);
     expect(out.find((f) => f.location.line === 3)!.fingerprint).toBe(mk(3).fingerprint);
@@ -81,7 +122,14 @@ describe('orchestration', () => {
     writeFileSync(join(dir, 'src/app.js'), 'const app = express();\ndb.query("SELECT * FROM t WHERE id = " + req.query.id);\n');
     writeFileSync(join(dir, 'Dockerfile'), 'FROM node:latest\nCMD ["node","src/app.js"]\n');
     writeFileSync(join(dir, 'requirements.txt'), 'flask==2.2.2\n');
-    const broken: ExternalScanner = new ExternalScanner('semgrep', 'semgrep', () => [], () => [], async () => '', () => false);
+    const broken: ExternalScanner = new ExternalScanner(
+      'semgrep',
+      'semgrep',
+      () => [],
+      () => [],
+      async () => '',
+      () => false,
+    );
     const svc = new ScannersService(new KnowledgeService());
     const res = await svc.scan({ root: dir, osv: false, external: false });
     expect(res.filesScanned).toBe(3);
@@ -97,7 +145,12 @@ describe('orchestration', () => {
 
   it('records scanner errors without failing the scan', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'so-'));
-    const failing = { name: 'boom', scan: async (): Promise<Finding[]> => { throw new Error('exploded'); } };
+    const failing = {
+      name: 'boom',
+      scan: async (): Promise<Finding[]> => {
+        throw new Error('exploded');
+      },
+    };
     const res = await new ScannersService(new KnowledgeService(), [failing]).scan({ root: dir });
     expect(res.scanners[0]).toMatchObject({ status: 'error', detail: 'exploded' });
   });

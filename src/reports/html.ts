@@ -17,7 +17,12 @@ export function assetPath(name: string): string {
 
 /** JSON that is safe inside <script type="application/json">. */
 export function safeJson(v: unknown): string {
-  return JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  return JSON.stringify(v)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
 
 export interface HtmlOptions {
@@ -38,7 +43,16 @@ export function toHtml(result: ScanResult, opts: HtmlOptions = {}): string {
     heatmap: knowledge.heatmap(result.findings),
     owasp: knowledge.allOwasp().map((c) => ({ id: c.id, name: c.name, url: c.url })),
     agent: opts.agent
-      ? { mode: opts.agent.mode, model: opts.agent.model, policy: opts.agent.policy, summary: opts.agent.summary, injections: opts.agent.injections, errors: opts.agent.errors, steps: opts.agent.steps, toolCalls: opts.agent.toolCalls }
+      ? {
+          mode: opts.agent.mode,
+          model: opts.agent.model,
+          policy: opts.agent.policy,
+          summary: opts.agent.summary,
+          injections: opts.agent.injections,
+          errors: opts.agent.errors,
+          steps: opts.agent.steps,
+          toolCalls: opts.agent.toolCalls,
+        }
       : null,
     scan: {
       id: result.id,
@@ -51,7 +65,9 @@ export function toHtml(result: ScanResult, opts: HtmlOptions = {}): string {
     findings: result.findings.map((f) => ({ ...f, fix: f.fix ? { ...f.fix, newContent: undefined } : undefined })),
   };
   const template = readFileSync(assetPath('report.html'), 'utf8');
-  return template.replace('"__SENTINELOPS_DATA__"', () => safeJson(data)).replace('<title>SentinelOps report</title>', () => `<title>${escapeHtml(data.title)} · ${escapeHtml(data.scan.root)}</title>`);
+  return template
+    .replace('"__SENTINELOPS_DATA__"', () => safeJson(data))
+    .replace('<title>SentinelOps report</title>', () => `<title>${escapeHtml(data.title)} · ${escapeHtml(data.scan.root)}</title>`);
 }
 
 export function escapeHtml(s: string): string {

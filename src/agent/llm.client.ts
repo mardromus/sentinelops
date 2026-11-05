@@ -10,7 +10,11 @@ export interface ToolCall {
 
 export type ChatMessage =
   | { role: 'system' | 'user'; content: string }
-  | { role: 'assistant'; content: string | null; tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[] }
+  | {
+      role: 'assistant';
+      content: string | null;
+      tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[];
+    }
   | { role: 'tool'; tool_call_id: string; content: string };
 
 export interface ToolSpec {
@@ -71,7 +75,11 @@ export class OpenAiCompatibleClient implements LlmClient {
         const msg = data.choices?.[0]?.message || {};
         return {
           content: msg.content ?? null,
-          toolCalls: (msg.tool_calls || []).map((c: any, i: number) => ({ id: c.id || `call_${i}`, name: c.function?.name, arguments: c.function?.arguments || '{}' })),
+          toolCalls: (msg.tool_calls || []).map((c: any, i: number) => ({
+            id: c.id || `call_${i}`,
+            name: c.function?.name,
+            arguments: c.function?.arguments || '{}',
+          })),
           usage: data.usage ? { prompt: data.usage.prompt_tokens, completion: data.usage.completion_tokens } : undefined,
         };
       } catch (e) {

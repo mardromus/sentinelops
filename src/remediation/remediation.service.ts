@@ -75,7 +75,10 @@ export class RemediationService {
     if (!earlier.length) return null;
     if (f.category === 'dependency' && f.package?.fixedIn) {
       const want = f.package.fixedIn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const pinned = new RegExp(`"${f.package.name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}"\\s*:\\s*"\\^?${want}"|^${f.package.name}==${want}\\b`, 'mi');
+      const pinned = new RegExp(
+        `"${f.package.name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}"\\s*:\\s*"\\^?${want}"|^${f.package.name}==${want}\\b`,
+        'mi',
+      );
       return pinned.test(current) ? earlier[earlier.length - 1].findingId : null;
     }
     const v = await verifyFix(f, file, original, current);
@@ -113,7 +116,10 @@ export class RemediationService {
       const prev = current.get(target.file)!;
       const p = await this.propose(located, ws, prev);
       if (!p) {
-        const by = prev !== original.get(target.file) ? await this.resolvedBy(located, target.file, original.get(target.file)!, prev, res.applied) : null;
+        const by =
+          prev !== original.get(target.file)
+            ? await this.resolvedBy(located, target.file, original.get(target.file)!, prev, res.applied)
+            : null;
         if (by) res.resolved.push({ findingId: f.id, by });
         else res.skipped.push({ findingId: f.id, reason: 'no fix for this exact code shape; needs a manual change' });
         continue;

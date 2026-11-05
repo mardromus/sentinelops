@@ -38,9 +38,18 @@ function findingDetails(f: Finding): string {
     esc(f.message),
   ];
   if (f.location.snippet && f.category !== 'dependency') lines.push('', block(f.location.snippet, 'text'));
-  if (f.verdict) lines.push('', `**Agent verdict:** ${f.verdict.status.replace(/_/g, ' ')} (${f.verdict.confidence}) — ${esc(f.verdict.rationale)}${f.verdict.guardrail ? ` _(${esc(f.verdict.guardrail)})_` : ''}`);
+  if (f.verdict)
+    lines.push(
+      '',
+      `**Agent verdict:** ${f.verdict.status.replace(/_/g, ' ')} (${f.verdict.confidence}) — ${esc(f.verdict.rationale)}${f.verdict.guardrail ? ` _(${esc(f.verdict.guardrail)})_` : ''}`,
+    );
   if (f.fix) {
-    lines.push('', `**Fix${f.fix.verified ? ' ✅ verified' : ' ⚠️ unverified'}** (${f.fix.strategy}): ${esc(f.fix.description)}`, '', block(f.fix.diff, 'diff'));
+    lines.push(
+      '',
+      `**Fix${f.fix.verified ? ' ✅ verified' : ' ⚠️ unverified'}** (${f.fix.strategy}): ${esc(f.fix.description)}`,
+      '',
+      block(f.fix.diff, 'diff'),
+    );
   } else if (f.remediation) lines.push('', `**How to fix:** ${esc(f.remediation)}`);
   lines.push('', '</details>');
   return lines.join('\n');
@@ -51,25 +60,46 @@ export function toMarkdown(result: ScanResult, opts: MarkdownOptions = {}): stri
   const count = (s: Severity) => active.filter((f) => f.severity === s).length;
   const out: string[] = [COMMENT_MARKER, `## 🛡️ ${opts.title || 'SentinelOps security review'}`, ''];
 
-  if (opts.gate) out.push(opts.gate.pass ? `**✅ Passed** — no active findings at or above \`${opts.gate.failOn}\`.` : `**❌ Failed** — active findings at or above \`${opts.gate.failOn}\` must be fixed or triaged.`, '');
+  if (opts.gate)
+    out.push(
+      opts.gate.pass
+        ? `**✅ Passed** — no active findings at or above \`${opts.gate.failOn}\`.`
+        : `**❌ Failed** — active findings at or above \`${opts.gate.failOn}\` must be fixed or triaged.`,
+      '',
+    );
   if (opts.diff) out.push(`This change introduces **${opts.diff.introduced}** and fixes **${opts.diff.fixed}** finding(s).`, '');
 
   out.push('| ' + ORDER.map((s) => `${ICON[s]} ${s}`).join(' | ') + ' | suppressed | fixes ready |');
   out.push('|' + ' :-: |'.repeat(ORDER.length + 2));
-  out.push('| ' + ORDER.map((s) => String(count(s))).join(' | ') + ` | ${result.findings.length - active.length} | ${active.filter((f) => f.fix?.verified).length} |`, '');
+  out.push(
+    '| ' +
+      ORDER.map((s) => String(count(s))).join(' | ') +
+      ` | ${result.findings.length - active.length} | ${active.filter((f) => f.fix?.verified).length} |`,
+    '',
+  );
 
   const owasp = OWASP_TOP10_2021.map((c) => ({ c, n: active.filter((f) => f.owasp.includes(c.id)).length })).filter((x) => x.n);
   if (owasp.length) out.push('**OWASP Top 10:** ' + owasp.map(({ c, n }) => `${c.id.slice(0, 3)} ${c.name} (${n})`).join(' · '), '');
 
   if (opts.agent?.summary) {
-    out.push(`### 🤖 Agent briefing (${opts.agent.mode === 'llm' ? opts.agent.model : 'offline planner'}, ${opts.agent.policy})`, '', opts.agent.summary.split('\n').map((l) => `> ${l}`).join('\n'), '');
+    out.push(
+      `### 🤖 Agent briefing (${opts.agent.mode === 'llm' ? opts.agent.model : 'offline planner'}, ${opts.agent.policy})`,
+      '',
+      opts.agent.summary
+        .split('\n')
+        .map((l) => `> ${l}`)
+        .join('\n'),
+      '',
+    );
   }
 
   if (active.length) {
     const max = opts.maxFindings ?? 25;
     out.push('### Findings', '', '| | id | priority | finding | location | fix |', '|---|---|---|---|---|---|');
     for (const f of active.slice(0, max)) {
-      out.push(`| ${ICON[f.severity]} | ${f.id} | ${f.priority || ''} | ${esc(f.title)} | ${code(`${f.location.file}:${f.location.line}`)} | ${f.fix ? (f.fix.verified ? '✅' : '⚠️') : ''} |`);
+      out.push(
+        `| ${ICON[f.severity]} | ${f.id} | ${f.priority || ''} | ${esc(f.title)} | ${code(`${f.location.file}:${f.location.line}`)} | ${f.fix ? (f.fix.verified ? '✅' : '⚠️') : ''} |`,
+      );
     }
     if (active.length > max) out.push('', `_…and ${active.length - max} more in the full report._`);
     out.push('', '### Details', '', ...active.slice(0, Math.min(max, 15)).map(findingDetails));
@@ -77,6 +107,9 @@ export function toMarkdown(result: ScanResult, opts: MarkdownOptions = {}): stri
     out.push('No active findings. 🎉');
   }
 
-  out.push('', `<sub>${result.filesScanned} files · scanners: ${result.scanners.map((s) => `${s.name} ${s.status === 'ok' ? '✓' : s.status}`).join(', ')} · scan ${result.id.slice(0, 8)}</sub>`);
+  out.push(
+    '',
+    `<sub>${result.filesScanned} files · scanners: ${result.scanners.map((s) => `${s.name} ${s.status === 'ok' ? '✓' : s.status}`).join(', ')} · scan ${result.id.slice(0, 8)}</sub>`,
+  );
   return out.join('\n') + '\n';
 }

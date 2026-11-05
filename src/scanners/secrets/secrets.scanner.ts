@@ -1,20 +1,11 @@
 import { Finding, SourceFile } from '../../common/types';
 import { isSuppressedInline } from '../files';
 import { makeFinding, ScanContext, Scanner } from '../scanner';
-import {
-  entropy,
-  ENV_LINE,
-  GENERIC_PATTERN,
-  isPlaceholder,
-  mask,
-  PROVIDER_PATTERNS,
-  SECRETISH_KEY,
-  SecretPattern,
-} from './patterns';
+import { entropy, ENV_LINE, GENERIC_PATTERN, isPlaceholder, mask, PROVIDER_PATTERNS, SECRETISH_KEY, SecretPattern } from './patterns';
 
-const SKIP_FILES = /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|Pipfile\.lock|\.env\.example|\.env\.sample|\.env\.template)$/;
-const REMEDIATION =
-  'Revoke and rotate the credential now (it is in git history), then load it from the environment or a secret manager.';
+const SKIP_FILES =
+  /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|Pipfile\.lock|\.env\.example|\.env\.sample|\.env\.template)$/;
+const REMEDIATION = 'Revoke and rotate the credential now (it is in git history), then load it from the environment or a secret manager.';
 
 interface Hit {
   pattern: SecretPattern;

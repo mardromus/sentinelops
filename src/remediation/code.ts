@@ -10,7 +10,16 @@ export function locate(lines: string[], f: Finding): number {
   const idx = f.location.line - 1;
   const snip = (f.location.snippet || '').trim();
   // secret snippets are masked ("abcd****yz"): match the masked run as a wildcard
-  const masked = /\*{4,}/.test(snip) ? new RegExp('^' + snip.split(/\*{4,}/).map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.+?') + '$') : null;
+  const masked = /\*{4,}/.test(snip)
+    ? new RegExp(
+        '^' +
+          snip
+            .split(/\*{4,}/)
+            .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .join('.+?') +
+          '$',
+      )
+    : null;
   const same = (line: string | undefined) => {
     if (line === undefined) return false;
     const t = line.trim();
@@ -121,9 +130,12 @@ export function ensureImport(lines: string[], mod: string, name: string, opts: {
   if (new RegExp(`(require\\(${modRe}\\)|from\\s+${modRe})`).test(content)) {
     // module is imported already: add a named import to an existing destructure if needed
     if (opts.default) return lines;
-    if (new RegExp(`\\b${name}\\b`).test(content.match(new RegExp(`.*(require\\(${modRe}\\)|from\\s+${modRe}).*`))?.[0] || '')) return lines;
+    if (new RegExp(`\\b${name}\\b`).test(content.match(new RegExp(`.*(require\\(${modRe}\\)|from\\s+${modRe}).*`))?.[0] || ''))
+      return lines;
     return lines.map((l) =>
-      new RegExp(`(require\\(${modRe}\\)|from\\s+${modRe})`).test(l) && /\{[^}]*\}/.test(l) ? l.replace(/\{\s*([^}]*?)\s*\}/, (_m, inner) => `{ ${inner}, ${name} }`) : l,
+      new RegExp(`(require\\(${modRe}\\)|from\\s+${modRe})`).test(l) && /\{[^}]*\}/.test(l)
+        ? l.replace(/\{\s*([^}]*?)\s*\}/, (_m, inner) => `{ ${inner}, ${name} }`)
+        : l,
     );
   }
   const stmt = isEsm(content)

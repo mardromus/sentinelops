@@ -131,15 +131,55 @@ export const containerYamlChecks: Check = (file) => {
     const line = raw.replace(/#.*$/, '');
     const n = i + 1;
     if (/^\s*privileged\s*:\s*true\b/.test(line))
-      add(n, 'config.container.privileged', 'Privileged container', 'high', ['CWE-250'], 'A privileged container has full access to the host kernel and devices.', 'Remove privileged: true; grant only the specific capabilities needed.');
+      add(
+        n,
+        'config.container.privileged',
+        'Privileged container',
+        'high',
+        ['CWE-250'],
+        'A privileged container has full access to the host kernel and devices.',
+        'Remove privileged: true; grant only the specific capabilities needed.',
+      );
     if (/^\s*(hostNetwork|hostPID|hostIPC)\s*:\s*true\b/.test(line) || /^\s*(network_mode|pid)\s*:\s*["']?host\b/.test(line))
-      add(n, 'config.container.host-namespace', 'Container shares host namespaces', 'medium', ['CWE-668'], 'Sharing host network/PID/IPC namespaces removes container isolation.', 'Use the default isolated namespaces and publish ports explicitly.');
+      add(
+        n,
+        'config.container.host-namespace',
+        'Container shares host namespaces',
+        'medium',
+        ['CWE-668'],
+        'Sharing host network/PID/IPC namespaces removes container isolation.',
+        'Use the default isolated namespaces and publish ports explicitly.',
+      );
     if (/docker\.sock/.test(line) && /^\s*-|\bpath\s*:/.test(line))
-      add(n, 'config.container.docker-socket', 'Docker socket mounted into container', 'high', ['CWE-668'], 'Access to docker.sock is root on the host.', 'Do not mount the Docker socket; use a restricted API proxy if unavoidable.');
+      add(
+        n,
+        'config.container.docker-socket',
+        'Docker socket mounted into container',
+        'high',
+        ['CWE-668'],
+        'Access to docker.sock is root on the host.',
+        'Do not mount the Docker socket; use a restricted API proxy if unavoidable.',
+      );
     if (/^\s*allowPrivilegeEscalation\s*:\s*true\b/.test(line))
-      add(n, 'config.k8s.privilege-escalation', 'Privilege escalation allowed', 'medium', ['CWE-250'], 'Processes can gain more privileges than their parent (setuid binaries).', 'Set allowPrivilegeEscalation: false in the securityContext.');
+      add(
+        n,
+        'config.k8s.privilege-escalation',
+        'Privilege escalation allowed',
+        'medium',
+        ['CWE-250'],
+        'Processes can gain more privileges than their parent (setuid binaries).',
+        'Set allowPrivilegeEscalation: false in the securityContext.',
+      );
     if (/^\s*runAsUser\s*:\s*0\b/.test(line) || /^\s*runAsNonRoot\s*:\s*false\b/.test(line))
-      add(n, 'config.k8s.runs-as-root', 'Pod runs as root', 'medium', ['CWE-250'], 'The container is explicitly configured to run as UID 0.', 'Set runAsNonRoot: true and a non-zero runAsUser.');
+      add(
+        n,
+        'config.k8s.runs-as-root',
+        'Pod runs as root',
+        'medium',
+        ['CWE-250'],
+        'The container is explicitly configured to run as UID 0.',
+        'Set runAsNonRoot: true and a non-zero runAsUser.',
+      );
   });
   return hits;
 };
@@ -227,7 +267,8 @@ export const envFileChecks: Check = (file) =>
           cwe: ['CWE-538'],
           line: 1,
           message: `${file.path} holds environment configuration and usually credentials; it should never be versioned.`,
-          remediation: 'git rm --cached the file, add it to .gitignore, commit a .env.example with placeholders and rotate any secrets it contained.',
+          remediation:
+            'git rm --cached the file, add it to .gitignore, commit a .env.example with placeholders and rotate any secrets it contained.',
         },
       ]
     : [];

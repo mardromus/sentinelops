@@ -95,11 +95,21 @@ export class WebhookService {
       const job = this.jobs.enqueue('command', (j) => this.command(j, payload, m[1] as 'rescan' | 'fix', m[2]));
       return { status: 202, body: { queued: true, job: job.id, command: m[1] } };
     }
-    if (event === 'push' && payload?.ref === `refs/heads/${payload?.repository?.default_branch}` && payload.after && !/^0+$/.test(payload.after)) {
+    if (
+      event === 'push' &&
+      payload?.ref === `refs/heads/${payload?.repository?.default_branch}` &&
+      payload.after &&
+      !/^0+$/.test(payload.after)
+    ) {
       const full = payload.repository.full_name as string;
       const job = this.jobs.enqueue('push', async (j) => {
         await this.withCheckout(full, payload.after, payload.ref, async (dir) => {
-          const { stored } = await this.pipeline.run({ root: dir, ai: false, fix: 'propose', source: { kind: 'webhook', repo: full, ref: payload.ref, sha: payload.after } });
+          const { stored } = await this.pipeline.run({
+            root: dir,
+            ai: false,
+            fix: 'propose',
+            source: { kind: 'webhook', repo: full, ref: payload.ref, sha: payload.after },
+          });
           j.scanId = stored.result.id;
         });
       });
@@ -149,22 +159,54 @@ export class WebhookService {
         this.log.warn(`fix PR for ${target} failed: ${e.message}`);
         return null;
       });
-      let body = toMarkdown(stored.result, { gate: stored.gate, agent: stored.agent, diff: stored.diff, title: `SentinelOps security review of ${sha.slice(0, 7)}` });
+      let body = toMarkdown(stored.result, {
+        gate: stored.gate,
+        agent: stored.agent,
+        diff: stored.diff,
+        title: `SentinelOps security review of ${sha.slice(0, 7)}`,
+      });
       if (fixPr) body += `\n🔧 Verified fixes are in ${fixPr.url} (${fixPr.draft ? 'draft, needs your review' : 'ready for review'}).\n`;
       body += `\n[Full report](${link})\n`;
       await this.github.upsertComment(owner, repo, number, body);
       const active = stored.summary.active;
-      await this.github.setStatus(owner, repo, sha, stored.gate.pass ? 'success' : 'failure', stored.gate.pass ? `${active} finding(s), none at or above ${stored.gate.failOn}` : `${stored.gate.blocking} blocking finding(s) at or above ${stored.gate.failOn}`, link);
-      this.audit.append({ actor: 'agent', action: 'github:review', target, allowed: true, details: { scan: stored.result.id, gate: stored.gate, fixPr: fixPr?.url } });
+      await this.github.setStatus(
+        owner,
+        repo,
+        sha,
+        stored.gate.pass ? 'success' : 'failure',
+        stored.gate.pass
+          ? `${active} finding(s), none at or above ${stored.gate.failOn}`
+          : `${stored.gate.blocking} blocking finding(s) at or above ${stored.gate.failOn}`,
+        link,
+      );
+      this.audit.append({
+        actor: 'agent',
+        action: 'github:review',
+        target,
+        allowed: true,
+        details: { scan: stored.result.id, gate: stored.gate, fixPr: fixPr?.url },
+      });
       return stored;
     });
   }
 
   /** Policy-gated: L2 drafts, L3 ready-for-review for low-risk fixes; a human "/sentinelops fix" counts as approval. */
-  private async maybeOpenFixPr(ctx: PrContext, stored: StoredScan, dir: string, requestedBy?: string, only?: string): Promise<{ url: string; draft: boolean } | null> {
+  private async maybeOpenFixPr(
+    ctx: PrContext,
+    stored: StoredScan,
+    dir: string,
+    requestedBy?: string,
+    only?: string,
+  ): Promise<{ url: string; draft: boolean } | null> {
     const target = `${ctx.owner}/${ctx.repo}#${ctx.number}`;
     if (!ctx.sameRepo) {
-      this.audit.append({ actor: 'agent', action: 'github:open_pr', target, allowed: false, reason: 'pull request comes from a fork; fixes are suggested in the comment only' });
+      this.audit.append({
+        actor: 'agent',
+        action: 'github:open_pr',
+        target,
+        allowed: false,
+        reason: 'pull request comes from a fork; fixes are suggested in the comment only',
+      });
       return null;
     }
     const policy = new Policy(this.config.autonomy);
@@ -172,8 +214,16 @@ export class WebhookService {
     const chosen: Finding[] = [];
     let draft = false;
     for (const f of candidates) {
-      const d = requestedBy ? { allowed: this.config.autonomy >= 1, needsApproval: false, reason: `requested by @${requestedBy}` } : policy.decide('open_pr', { fix: f.fix, finding: f });
-      this.audit.append({ actor: requestedBy ? 'human' : 'agent', action: 'github:open_pr', target: f.id, allowed: d.allowed, reason: d.reason });
+      const d = requestedBy
+        ? { allowed: this.config.autonomy >= 1, needsApproval: false, reason: `requested by @${requestedBy}` }
+        : policy.decide('open_pr', { fix: f.fix, finding: f });
+      this.audit.append({
+        actor: requestedBy ? 'human' : 'agent',
+        action: 'github:open_pr',
+        target: f.id,
+        allowed: d.allowed,
+        reason: d.reason,
+      });
       if (!d.allowed) continue;
       chosen.push(f);
       draft ||= d.needsApproval;
@@ -193,11 +243,19 @@ export class WebhookService {
         '',
         ...lines,
         '',
-        requestedBy ? `Requested by @${requestedBy}.` : `Opened by the SentinelOps agent at autonomy ${policy.name}. A human must review and merge.`,
+        requestedBy
+          ? `Requested by @${requestedBy}.`
+          : `Opened by the SentinelOps agent at autonomy ${policy.name}. A human must review and merge.`,
       ].join('\n'),
       draft,
     });
-    this.audit.append({ actor: requestedBy ? 'human' : 'agent', action: 'github:pr_opened', target, allowed: true, details: { url: pr.url, branch, draft, fixes: res.applied.map((p) => p.findingId) } });
+    this.audit.append({
+      actor: requestedBy ? 'human' : 'agent',
+      action: 'github:pr_opened',
+      target,
+      allowed: true,
+      details: { url: pr.url, branch, draft, fixes: res.applied.map((p) => p.findingId) },
+    });
     return { url: pr.url, draft };
   }
 
@@ -206,7 +264,14 @@ export class WebhookService {
     const user = String(payload.comment.user?.login || '');
     const perm = await this.github.permission(owner, repo, user);
     const allowed = WRITE.has(perm);
-    this.audit.append({ actor: 'human', action: `github:command:${cmd}`, target: `${owner}/${repo}#${payload.issue.number}`, allowed, reason: `@${user} has ${perm} access`, details: { findingId } });
+    this.audit.append({
+      actor: 'human',
+      action: `github:command:${cmd}`,
+      target: `${owner}/${repo}#${payload.issue.number}`,
+      allowed,
+      reason: `@${user} has ${perm} access`,
+      details: { findingId },
+    });
     if (!allowed) {
       job.detail = `@${user} needs write access (has ${perm})`;
       return;
@@ -219,10 +284,17 @@ export class WebhookService {
       return;
     }
     await this.withCheckout(ctx.headRepo, ctx.sha, `refs/pull/${ctx.number}/head`, async (dir) => {
-      const { stored } = await this.pipeline.run({ root: dir, ai: false, fix: 'propose', source: { kind: 'webhook', repo: `${owner}/${repo}`, pr: ctx.number, sha: ctx.sha } });
+      const { stored } = await this.pipeline.run({
+        root: dir,
+        ai: false,
+        fix: 'propose',
+        source: { kind: 'webhook', repo: `${owner}/${repo}`, pr: ctx.number, sha: ctx.sha },
+      });
       job.scanId = stored.result.id;
       const fixPr = await this.maybeOpenFixPr(ctx, stored, dir, user, findingId);
-      const msg = fixPr ? `🔧 @${user} opened ${fixPr.url} with the verified fix(es).` : `@${user} no verified fix is available${findingId ? ` for ${findingId}` : ''}${ctx.sameRepo ? '' : ' (fork PRs only get suggestions)'}.`;
+      const msg = fixPr
+        ? `🔧 @${user} opened ${fixPr.url} with the verified fix(es).`
+        : `@${user} no verified fix is available${findingId ? ` for ${findingId}` : ''}${ctx.sameRepo ? '' : ' (fork PRs only get suggestions)'}.`;
       await this.github.comment(owner, repo, ctx.number, msg);
     });
   }

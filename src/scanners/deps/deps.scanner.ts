@@ -12,9 +12,7 @@ export function matchOffline(dep: Dependency, db: Advisory[] = OFFLINE_ADVISORIE
 
 /** Smallest fixed version above the installed one across all advisories (what to bump to). */
 export function fixedVersion(dep: Dependency, advs: Advisory[]): string | undefined {
-  const fixes = advs
-    .flatMap((a) => a.ranges.filter((r) => inRange(dep.version, r)).map((r) => r.fixed))
-    .filter((v): v is string => !!v);
+  const fixes = advs.flatMap((a) => a.ranges.filter((r) => inRange(dep.version, r)).map((r) => r.fixed)).filter((v): v is string => !!v);
   if (!fixes.length) return undefined;
   return fixes.sort(compareVersions)[fixes.length - 1];
 }

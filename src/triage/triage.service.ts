@@ -17,7 +17,8 @@ import { Confidence, Finding, Priority, ScanResult, Severity } from '../common/t
 const BASE: Record<Severity, number> = { critical: 90, high: 70, medium: 45, low: 22, info: 5 };
 const CONF: Record<Confidence, number> = { high: 1, medium: 0.85, low: 0.65 };
 
-export const NON_PRODUCTION_PATH = /(^|\/)(tests?|__tests__|spec|specs|fixtures?|examples?|samples?|docs?|mocks?|__mocks__|testdata|e2e)(\/|$)|\.(test|spec)\.[jt]sx?$|_test\.py$|(^|\/)test_[^/]+\.py$/i;
+export const NON_PRODUCTION_PATH =
+  /(^|\/)(tests?|__tests__|spec|specs|fixtures?|examples?|samples?|docs?|mocks?|__mocks__|testdata|e2e)(\/|$)|\.(test|spec)\.[jt]sx?$|_test\.py$|(^|\/)test_[^/]+\.py$/i;
 const PRODUCTION_PATH = /(^|\/)(src|app|server|api|lib|routes|controllers|services)(\/|$)/i;
 
 export interface BaselineEntry {
@@ -111,7 +112,11 @@ export class TriageService {
       }
     }
     result.findings.sort(
-      (x, y) => Number(!!x.suppressed) - Number(!!y.suppressed) || (y.risk ?? 0) - (x.risk ?? 0) || x.location.file.localeCompare(y.location.file) || x.location.line - y.location.line,
+      (x, y) =>
+        Number(!!x.suppressed) - Number(!!y.suppressed) ||
+        (y.risk ?? 0) - (x.risk ?? 0) ||
+        x.location.file.localeCompare(y.location.file) ||
+        x.location.line - y.location.line,
     );
     return result;
   }
@@ -127,7 +132,9 @@ export class TriageService {
       bySeverity: count((f) => f.severity),
       byPriority: count((f) => f.priority || 'P4'),
       byCategory: count((f) => f.category),
-      riskScore: active.length ? Math.round(Math.max(...active.map((f) => f.risk ?? 0)) * 0.6 + Math.min(40, active.reduce((s, f) => s + (f.risk ?? 0), 0) / 25)) : 0,
+      riskScore: active.length
+        ? Math.round(Math.max(...active.map((f) => f.risk ?? 0)) * 0.6 + Math.min(40, active.reduce((s, f) => s + (f.risk ?? 0), 0) / 25))
+        : 0,
     };
   }
 

@@ -24,9 +24,7 @@ describe('knowledge base', () => {
   const kb = new KnowledgeService();
 
   it('has all ten OWASP 2021 categories and every CWE maps to one of them', () => {
-    expect(OWASP_TOP10_2021.map((c) => c.id)).toEqual(
-      Array.from({ length: 10 }, (_, i) => `A${String(i + 1).padStart(2, '0')}:2021`),
-    );
+    expect(OWASP_TOP10_2021.map((c) => c.id)).toEqual(Array.from({ length: 10 }, (_, i) => `A${String(i + 1).padStart(2, '0')}:2021`));
     const ids = new Set(OWASP_TOP10_2021.map((c) => c.id));
     for (const e of Object.values(CWE)) expect(ids.has(e.owasp)).toBe(true);
   });

@@ -30,7 +30,9 @@ export function disambiguate(findings: Finding[]): Finding[] {
     g.sort((a, b) => a.location.line - b.location.line);
     g.slice(1).forEach((f, i) => {
       if (f.location.line === g[0].location.line) return;
-      f.fingerprint = createHash('sha256').update(`${f.fingerprint}#${i + 2}`).digest('hex');
+      f.fingerprint = createHash('sha256')
+        .update(`${f.fingerprint}#${i + 2}`)
+        .digest('hex');
       f.id = shortId(f.fingerprint);
     });
   }
@@ -57,7 +59,9 @@ export function dedupe(findings: Finding[]): Finding[] {
       out.set(k, f);
       continue;
     }
-    const better = severityRank(f.severity) > severityRank(prev.severity) || (f.severity === prev.severity && f.scanner.startsWith('builtin') && !prev.scanner.startsWith('builtin'));
+    const better =
+      severityRank(f.severity) > severityRank(prev.severity) ||
+      (f.severity === prev.severity && f.scanner.startsWith('builtin') && !prev.scanner.startsWith('builtin'));
     const [keep, drop] = better ? [f, prev] : [prev, f];
     keep.triageNotes = [...(keep.triageNotes || []), `also reported by ${drop.scanner} (${drop.ruleId})`];
     out.set(k, keep);
@@ -103,7 +107,13 @@ export class ScannersService {
       this.scanners.map(async (s) => {
         const t0 = Date.now();
         if (s instanceof ExternalScanner && (opts.external === false || !s.isAvailable())) {
-          runs.push({ name: s.name, status: 'skipped', findings: 0, durationMs: 0, detail: opts.external === false ? 'disabled' : 'not installed' });
+          runs.push({
+            name: s.name,
+            status: 'skipped',
+            findings: 0,
+            durationMs: 0,
+            detail: opts.external === false ? 'disabled' : 'not installed',
+          });
           return;
         }
         try {
@@ -112,7 +122,13 @@ export class ScannersService {
           const detail = s instanceof DependencyScanner ? `advisories: ${s.lastSource}` : undefined;
           runs.push({ name: s.name, status: 'ok', findings: fs.length, durationMs: Date.now() - t0, detail });
         } catch (e) {
-          runs.push({ name: s.name, status: 'error', findings: 0, durationMs: Date.now() - t0, detail: (e as Error).message.slice(0, 300) });
+          runs.push({
+            name: s.name,
+            status: 'error',
+            findings: 0,
+            durationMs: Date.now() - t0,
+            detail: (e as Error).message.slice(0, 300),
+          });
         }
       }),
     );

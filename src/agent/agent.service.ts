@@ -68,7 +68,9 @@ export function systemPrompt(policy: Policy, maxFindings: number): string {
 /** Remove finding ids / CVE ids the model mentions that do not exist in the scan. */
 export function validateSummary(text: string, result: ScanResult): { text: string; removed: string[] } {
   const ids = new Set(result.findings.map((f) => f.id));
-  const cves = new Set(result.findings.flatMap((f) => f.package?.aliases || []).concat(result.findings.map((f) => f.package?.advisory || '')));
+  const cves = new Set(
+    result.findings.flatMap((f) => f.package?.aliases || []).concat(result.findings.map((f) => f.package?.advisory || '')),
+  );
   const removed: string[] = [];
   const out = text
     .replace(/\bSO-[0-9a-f]{8}\b/g, (m) => (ids.has(m) ? m : (removed.push(m), '[unknown finding]')))
@@ -105,7 +107,12 @@ export class AgentService {
     const audit = opts.audit ?? new AuditLog(null);
     const maxFindings = opts.maxFindings ?? 8;
     const mode = opts.mode ?? 'auto';
-    audit.append({ actor: 'agent', action: 'session:start', target: result.id, details: { policy: policy.name, findings: result.findings.length, mode } });
+    audit.append({
+      actor: 'agent',
+      action: 'session:start',
+      target: result.id,
+      details: { policy: policy.name, findings: result.findings.length, mode },
+    });
 
     const errors: string[] = [];
     let report: AgentReport | null = null;
@@ -131,7 +138,12 @@ export class AgentService {
       const f = result.findings.find((x) => x.id === p.findingId);
       if (f && (!f.fix || (!f.fix.verified && p.verified))) f.fix = p;
     }
-    audit.append({ actor: 'agent', action: 'session:end', target: result.id, details: { mode: report.mode, verdicts: report.verdicts.length, fixes: report.fixes.length, injections: report.injections.length } });
+    audit.append({
+      actor: 'agent',
+      action: 'session:end',
+      target: result.id,
+      details: { mode: report.mode, verdicts: report.verdicts.length, fixes: report.fixes.length, injections: report.injections.length },
+    });
     return report;
   }
 
@@ -146,7 +158,11 @@ export class AgentService {
         role: 'user',
         content:
           `Scan ${result.id} of ${result.filesScanned} files finished with ${active.length} active findings ` +
-          `(${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ') || 'none'}). ` +
+          `(${
+            Object.entries(counts)
+              .map(([k, v]) => `${v} ${k}`)
+              .join(', ') || 'none'
+          }). ` +
           `Scanners: ${result.scanners.map((r) => `${r.name}=${r.status}`).join(', ')}. Start with list_findings.`,
       },
     ];
@@ -164,7 +180,11 @@ export class AgentService {
         finalText = res.content || '';
         break;
       }
-      messages.push({ role: 'assistant', content: res.content, tool_calls: res.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.arguments } })) });
+      messages.push({
+        role: 'assistant',
+        content: res.content,
+        tool_calls: res.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.arguments } })),
+      });
       for (const call of res.toolCalls.slice(0, 8)) {
         toolCalls++;
         const out = await runTool(s, call.name, parseArgs(call.arguments));
@@ -182,7 +202,11 @@ export class AgentService {
       toolCalls,
       verdicts: [...s.verdicts].map(([findingId, v]) => ({ findingId, ...v })),
       fixes: [...s.fixes.values()],
-      summary: text + (s.injections.length ? `\n\nWarning: instructions aimed at AI reviewers were found in ${s.injections.map((i) => i.source).join(', ')} and ignored.` : ''),
+      summary:
+        text +
+        (s.injections.length
+          ? `\n\nWarning: instructions aimed at AI reviewers were found in ${s.injections.map((i) => i.source).join(', ')} and ignored.`
+          : ''),
       injections: s.injections,
       removedReferences: removed,
       errors,
@@ -225,25 +249,38 @@ export class AgentService {
 }
 
 export function offlineVerdict(f: Finding): Verdict {
-  const v = (status: Verdict['status'], confidence: Verdict['confidence'], rationale: string): Verdict => ({ status, confidence, rationale, by: 'offline' });
-  if (NON_PRODUCTION_PATH.test(f.location.file)) return v('likely_false_positive', 'medium', 'Located in test, example or documentation code that is normally not deployed.');
+  const v = (status: Verdict['status'], confidence: Verdict['confidence'], rationale: string): Verdict => ({
+    status,
+    confidence,
+    rationale,
+    by: 'offline',
+  });
+  if (NON_PRODUCTION_PATH.test(f.location.file))
+    return v('likely_false_positive', 'medium', 'Located in test, example or documentation code that is normally not deployed.');
   if (f.category === 'dependency')
     return f.package?.dev
       ? v('true_positive', 'medium', `${f.package.name}@${f.package.version} is in an advisory range but only used for development.`)
       : v('true_positive', 'high', `${f.package?.name}@${f.package?.version} is inside the affected range of ${f.package?.advisory}.`);
-  if (/straight from the HTTP request/.test(f.message)) return v('true_positive', 'high', 'Request input reaches the dangerous call on the same line without validation.');
+  if (/straight from the HTTP request/.test(f.message))
+    return v('true_positive', 'high', 'Request input reaches the dangerous call on the same line without validation.');
   if (f.confidence === 'high') return v('true_positive', 'high', 'High-precision rule matched a known dangerous pattern.');
-  if (f.confidence === 'medium') return v('true_positive', 'medium', 'Dangerous pattern matched; confirm the value cannot be attacker-controlled.');
+  if (f.confidence === 'medium')
+    return v('true_positive', 'medium', 'Dangerous pattern matched; confirm the value cannot be attacker-controlled.');
   return v('needs_review', 'low', 'Low-precision rule; a human should confirm.');
 }
 
 export function offlineSummary(result: ScanResult, s: AgentSession): string {
   const active = result.findings.filter((f) => !f.suppressed);
   if (!active.length) return `No active findings in ${result.filesScanned} files. Nothing to fix.`;
-  const sev = ['critical', 'high', 'medium', 'low', 'info'].map((k) => [k, active.filter((f) => f.severity === k).length] as const).filter(([, n]) => n);
+  const sev = ['critical', 'high', 'medium', 'low', 'info']
+    .map((k) => [k, active.filter((f) => f.severity === k).length] as const)
+    .filter(([, n]) => n);
   const owasp = [...new Set(active.flatMap((f) => f.owasp))].sort();
   const p1 = active.filter((f) => f.priority === 'P1');
-  const verifiedIds = new Set([...[...s.fixes.values()].filter((p) => p.verified).map((p) => p.findingId), ...active.filter((f) => f.fix?.verified).map((f) => f.id)]);
+  const verifiedIds = new Set([
+    ...[...s.fixes.values()].filter((p) => p.verified).map((p) => p.findingId),
+    ...active.filter((f) => f.fix?.verified).map((f) => f.id),
+  ]);
   const verified = [...verifiedIds].map((findingId) => ({ findingId }));
   const lines = [
     `${active.length} active findings in ${result.filesScanned} files (${sev.map(([k, n]) => `${n} ${k}`).join(', ')}), across OWASP ${owasp.join(', ')}.`,
@@ -256,14 +293,27 @@ export function offlineSummary(result: ScanResult, s: AgentSession): string {
         .join('; ')}${p1.length > 5 ? `; and ${p1.length - 5} more` : ''}.`,
     );
   const secrets = active.filter((f) => f.category === 'secret');
-  if (secrets.length) lines.push(`${secrets.length} committed credential(s): rotate them now, a code fix does not remove them from git history.`);
+  if (secrets.length)
+    lines.push(`${secrets.length} committed credential(s): rotate them now, a code fix does not remove them from git history.`);
   lines.push(
     verified.length
-      ? `${verified.length} verified fix(es) are ready (${verified.slice(0, 6).map((p) => p.findingId).join(', ')}${verified.length > 6 ? ', ...' : ''}); each was re-scanned after editing.`
+      ? `${verified.length} verified fix(es) are ready (${verified
+          .slice(0, 6)
+          .map((p) => p.findingId)
+          .join(', ')}${verified.length > 6 ? ', ...' : ''}); each was re-scanned after editing.`
       : 'No deterministic fixes were available for the top findings; they need a manual change.',
   );
   const review = [...s.verdicts].filter(([, v]) => v.status !== 'true_positive');
-  if (review.length) lines.push(`${review.length} finding(s) need a human look (${review.slice(0, 5).map(([id]) => id).join(', ')}).`);
-  if (s.injections.length) lines.push(`Warning: text addressed to AI reviewers was found in ${s.injections.map((i) => i.source).join(', ')}; it was ignored and the affected verdicts were left for human review.`);
+  if (review.length)
+    lines.push(
+      `${review.length} finding(s) need a human look (${review
+        .slice(0, 5)
+        .map(([id]) => id)
+        .join(', ')}).`,
+    );
+  if (s.injections.length)
+    lines.push(
+      `Warning: text addressed to AI reviewers was found in ${s.injections.map((i) => i.source).join(', ')}; it was ignored and the affected verdicts were left for human review.`,
+    );
   return lines.join(' ');
 }

@@ -20,7 +20,12 @@ describe('prompt-injection detection', () => {
   });
 
   it('does not flag ordinary code and comments', () => {
-    for (const t of ['// ignore whitespace when comparing', 'if (user.isAdmin) return next();', 'logger.info("previous instructions loaded")', '// TODO: report errors to sentry']) {
+    for (const t of [
+      '// ignore whitespace when comparing',
+      'if (user.isAdmin) return next();',
+      'logger.info("previous instructions loaded")',
+      '// TODO: report errors to sentry',
+    ]) {
       expect(detectInjection(t).flagged).toBe(false);
     }
   });
@@ -48,13 +53,31 @@ describe('path sandbox', () => {
     expect(sbx.check('src/app.js')).toBe('src/app.js');
     expect(sbx.check(join(root, 'src/app.js'))).toBe('src/app.js');
   });
-  it.each(['../../etc/passwd', '/etc/passwd', 'link/x', '.env', 'config/.env.production', '.git/config', 'keys/server.pem', 'node_modules/x/index.js', 'a\0b'])('blocks %s', (p) => {
+  it.each([
+    '../../etc/passwd',
+    '/etc/passwd',
+    'link/x',
+    '.env',
+    'config/.env.production',
+    '.git/config',
+    'keys/server.pem',
+    'node_modules/x/index.js',
+    'a\0b',
+  ])('blocks %s', (p) => {
     expect(() => sbx.check(p)).toThrow();
   });
 });
 
 describe('autonomy policy', () => {
-  const fix = (over: Partial<FixProposal> = {}): FixProposal => ({ findingId: 'SO-1', strategy: 'rule', description: '', file: 'a.js', diff: '--- a/a.js\n+++ b/a.js\n@@ -1,1 +1,1 @@\n-x\n+y\n', verified: true, ...over });
+  const fix = (over: Partial<FixProposal> = {}): FixProposal => ({
+    findingId: 'SO-1',
+    strategy: 'rule',
+    description: '',
+    file: 'a.js',
+    diff: '--- a/a.js\n+++ b/a.js\n@@ -1,1 +1,1 @@\n-x\n+y\n',
+    verified: true,
+    ...over,
+  });
 
   it('never lets the agent suppress, merge or push to the default branch', () => {
     for (const lvl of [0, 1, 2, 3] as const) {

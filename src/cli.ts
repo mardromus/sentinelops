@@ -18,7 +18,7 @@ import { CliModule } from './app.module';
 import { Finding, Severity } from './common/types';
 import { AutonomyLevel, loadConfig } from './config/config';
 import { PipelineService } from './pipeline/pipeline.service';
-import { fixerFor } from './remediation/fixers';
+import { hasFixer } from './remediation/fixers';
 import { toHtml } from './reports/html';
 import { toMarkdown } from './reports/markdown';
 import { toSarif, TOOL_VERSION } from './reports/sarif';
@@ -53,8 +53,23 @@ export function parseArgs(argv: string[]): Args {
 
 const tty = process.stdout.isTTY && !process.env.NO_COLOR;
 const paint = (code: string) => (s: string) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
-const C = { bold: paint('1'), dim: paint('2'), red: paint('31'), green: paint('32'), yellow: paint('33'), blue: paint('34'), magenta: paint('35'), cyan: paint('36') };
-const SEV_PAINT: Record<Severity, (s: string) => string> = { critical: (s) => C.bold(C.red(s)), high: C.red, medium: C.yellow, low: C.blue, info: C.dim };
+const C = {
+  bold: paint('1'),
+  dim: paint('2'),
+  red: paint('31'),
+  green: paint('32'),
+  yellow: paint('33'),
+  blue: paint('34'),
+  magenta: paint('35'),
+  cyan: paint('36'),
+};
+const SEV_PAINT: Record<Severity, (s: string) => string> = {
+  critical: (s) => C.bold(C.red(s)),
+  high: C.red,
+  medium: C.yellow,
+  low: C.blue,
+  info: C.dim,
+};
 
 function write(path: string, content: string): string {
   const p = resolve(path);
@@ -98,7 +113,10 @@ function printScan(stored: Awaited<ReturnType<PipelineService['run']>>['stored']
   console.log(
     '  ' +
       result.scanners
-        .map((s) => `${s.name} ${s.status === 'ok' ? C.green('✓') : s.status === 'skipped' ? C.dim('skipped') : C.red('error')}${s.detail && s.status === 'ok' ? C.dim(` (${s.detail})`) : ''}`)
+        .map(
+          (s) =>
+            `${s.name} ${s.status === 'ok' ? C.green('✓') : s.status === 'skipped' ? C.dim('skipped') : C.red('error')}${s.detail && s.status === 'ok' ? C.dim(` (${s.detail})`) : ''}`,
+        )
         .join('  '),
   );
   console.log('');
@@ -118,14 +136,19 @@ function printScan(stored: Awaited<ReturnType<PipelineService['run']>>['stored']
     for (const e of agent.errors) console.log('  ' + C.dim(e));
   }
   console.log('');
-  console.log(gate.pass ? C.green(`  ✔ gate passed (no active findings at or above ${gate.failOn})`) : C.red(`  ✖ gate failed: ${gate.blocking} active finding(s) at or above ${gate.failOn}`));
+  console.log(
+    gate.pass
+      ? C.green(`  ✔ gate passed (no active findings at or above ${gate.failOn})`)
+      : C.red(`  ✖ gate failed: ${gate.blocking} active finding(s) at or above ${gate.failOn}`),
+  );
 }
 
 function printFinding(f: Finding): void {
   const fix = f.fix ? (f.fix.verified ? C.green(' [fix ✓]') : C.yellow(' [fix ?]')) : '';
   console.log(`  ${SEV_PAINT[f.severity](f.severity.padEnd(8))} ${C.dim(f.priority || '  ')} ${C.bold(f.id)} ${f.title}${fix}`);
   console.log(`  ${' '.repeat(12)}${C.dim(`${f.location.file}:${f.location.line}  ${f.cwe.join(',')}  ${f.owasp.join(',')}`)}`);
-  if (f.verdict && f.verdict.status !== 'true_positive') console.log(`  ${' '.repeat(12)}${C.magenta(`agent: ${f.verdict.status.replace(/_/g, ' ')} — ${f.verdict.rationale}`)}`);
+  if (f.verdict && f.verdict.status !== 'true_positive')
+    console.log(`  ${' '.repeat(12)}${C.magenta(`agent: ${f.verdict.status.replace(/_/g, ' ')} — ${f.verdict.rationale}`)}`);
 }
 
 function wrap(text: string, width: number): string[] {
@@ -184,14 +207,22 @@ export async function main(argv: string[]): Promise<number> {
       printScan(stored, Number(flags.top) || 12);
       const outs: string[] = [];
       if (typeof flags.sarif === 'string') outs.push(write(flags.sarif, JSON.stringify(toSarif(stored.result), null, 2)));
-      if (typeof flags.html === 'string') outs.push(write(flags.html, toHtml(stored.result, { gate: stored.gate, agent: stored.agent, summary: stored.summary })));
-      if (typeof flags.md === 'string') outs.push(write(flags.md, toMarkdown(stored.result, { gate: stored.gate, agent: stored.agent, diff: stored.diff })));
+      if (typeof flags.html === 'string')
+        outs.push(write(flags.html, toHtml(stored.result, { gate: stored.gate, agent: stored.agent, summary: stored.summary })));
+      if (typeof flags.md === 'string')
+        outs.push(write(flags.md, toMarkdown(stored.result, { gate: stored.gate, agent: stored.agent, diff: stored.diff })));
       if (typeof flags.json === 'string') outs.push(write(flags.json, JSON.stringify(stored, null, 2)));
       if (applied) {
-        console.log(C.green(`  ✔ applied ${applied.applied.length} verified fix(es) to ${applied.files.length} file(s) in ${applied.root}`) + (applied.skipped.length ? C.dim(` (${applied.skipped.length} skipped)`) : ''));
+        console.log(
+          C.green(`  ✔ applied ${applied.applied.length} verified fix(es) to ${applied.files.length} file(s) in ${applied.root}`) +
+            (applied.skipped.length ? C.dim(` (${applied.skipped.length} skipped)`) : ''),
+        );
         for (const f of applied.files) console.log(C.dim(`      ${f.path}`));
         // the patch sits next to the fixed tree, never inside a scanned directory (it contains the removed lines)
-        const patch = typeof flags['out-dir'] === 'string' ? resolve(flags['out-dir']).replace(/[\\/]+$/, '') + '.diff' : join(root, '.sentinelops', 'fixes.diff');
+        const patch =
+          typeof flags['out-dir'] === 'string'
+            ? resolve(flags['out-dir']).replace(/[\\/]+$/, '') + '.diff'
+            : join(root, '.sentinelops', 'fixes.diff');
         if (applied.files.length) outs.push(write(patch, applied.files.map((f) => f.diff).join('\n')));
       }
       for (const o of outs) console.log(C.dim(`  wrote ${o}`));
@@ -208,8 +239,13 @@ export async function main(argv: string[]): Promise<number> {
     try {
       const res = await app.get(ScannersService).scan({ root, osv: false, external: false });
       const reason = typeof flags.reason === 'string' ? flags.reason : 'accepted at baseline';
-      const entries: BaselineEntry[] = res.findings.filter((f) => !f.suppressed).map((f) => ({ fingerprint: f.fingerprint, reason: `${reason} (${f.ruleId} ${f.location.file}:${f.location.line})` }));
-      const p = write(join(root, '.sentinelops', 'baseline.json'), JSON.stringify({ createdAt: new Date().toISOString(), entries }, null, 2) + '\n');
+      const entries: BaselineEntry[] = res.findings
+        .filter((f) => !f.suppressed)
+        .map((f) => ({ fingerprint: f.fingerprint, reason: `${reason} (${f.ruleId} ${f.location.file}:${f.location.line})` }));
+      const p = write(
+        join(root, '.sentinelops', 'baseline.json'),
+        JSON.stringify({ createdAt: new Date().toISOString(), entries }, null, 2) + '\n',
+      );
       console.log(`baselined ${entries.length} finding(s) -> ${p}\nFuture scans only report new issues. Review the baseline like code.`);
       return 0;
     } finally {
@@ -225,17 +261,26 @@ export async function main(argv: string[]): Promise<number> {
 
   if (cmd === 'rules') {
     for (const r of RULES) {
-      const fix = fixerFor({ ruleId: r.id, category: 'sast' } as Finding) ? C.green('autofix') : '       ';
+      const fix = hasFixer(r.id) ? C.green('autofix') : '       ';
       console.log(`${SEV_PAINT[r.severity](r.severity.padEnd(8))} ${fix} ${r.id.padEnd(40)} ${C.dim(r.cwe.join(','))}  ${r.title}`);
     }
-    console.log(C.dim(`\n${RULES.length} SAST rules + secrets, dependency (OSV) and IaC/pipeline checks. Autonomy levels: ${Object.entries(LEVEL_NAMES).map(([k, v]) => `L${k} ${v}`).join(', ')}`));
+    console.log(
+      C.dim(
+        `\n${RULES.length} SAST rules + secrets, dependency (OSV) and IaC/pipeline checks. Autonomy levels: ${Object.entries(LEVEL_NAMES)
+          .map(([k, v]) => `L${k} ${v}`)
+          .join(', ')}`,
+      ),
+    );
     return 0;
   }
 
   if (cmd === 'audit') {
     const log = new AuditLog(join(base.dataDir, 'audit.jsonl'));
     const v = log.verify();
-    for (const e of log.tail(Number(flags.tail) || 20)) console.log(`${C.dim(String(e.seq).padStart(5))} ${C.dim(e.ts)} ${e.actor.padEnd(6)} ${e.action.padEnd(24)} ${e.target || ''} ${e.allowed === false ? C.red('denied') : ''} ${C.dim(e.reason || '')}`);
+    for (const e of log.tail(Number(flags.tail) || 20))
+      console.log(
+        `${C.dim(String(e.seq).padStart(5))} ${C.dim(e.ts)} ${e.actor.padEnd(6)} ${e.action.padEnd(24)} ${e.target || ''} ${e.allowed === false ? C.red('denied') : ''} ${C.dim(e.reason || '')}`,
+      );
     console.log(v.valid ? C.green(`audit chain intact (${v.count} entries)`) : C.red(`audit chain BROKEN at entry ${v.brokenAt}`));
     return v.valid ? 0 : 1;
   }

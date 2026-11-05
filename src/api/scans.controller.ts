@@ -1,5 +1,18 @@
 import { isAbsolute, relative, resolve } from 'node:path';
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Header, Inject, NotFoundException, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Header,
+  Inject,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { Severity } from '../common/types';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { PipelineService } from '../pipeline/pipeline.service';
@@ -109,8 +122,15 @@ export class ScansController {
       gate: s.gate,
       summary: s.summary,
       diff: s.diff,
-      agent: s.agent ? { mode: s.agent.mode, summary: s.agent.summary, verdicts: s.agent.verdicts.length, fixes: s.agent.fixes.length } : undefined,
-      links: { self: `/api/scans/${s.result.id}`, html: `/api/scans/${s.result.id}/report.html`, sarif: `/api/scans/${s.result.id}/sarif`, markdown: `/api/scans/${s.result.id}/report.md` },
+      agent: s.agent
+        ? { mode: s.agent.mode, summary: s.agent.summary, verdicts: s.agent.verdicts.length, fixes: s.agent.fixes.length }
+        : undefined,
+      links: {
+        self: `/api/scans/${s.result.id}`,
+        html: `/api/scans/${s.result.id}/report.html`,
+        sarif: `/api/scans/${s.result.id}/sarif`,
+        markdown: `/api/scans/${s.result.id}/report.md`,
+      },
     };
   }
 }

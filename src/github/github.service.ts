@@ -12,7 +12,10 @@ import { APP_CONFIG, AppConfig } from '../config/config';
 import { COMMENT_MARKER } from '../reports/markdown';
 
 export const GITHUB_HTTP = Symbol('GITHUB_HTTP');
-export type HttpFn = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; json(): Promise<any>; text(): Promise<string> }>;
+export type HttpFn = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body?: string },
+) => Promise<{ ok: boolean; status: number; json(): Promise<any>; text(): Promise<string> }>;
 
 /** X-Hub-Signature-256 check (HMAC-SHA256 of the raw body), constant time. */
 export function verifySignature(secret: string, rawBody: Buffer | string, header: string | undefined): boolean {
@@ -83,14 +86,29 @@ export class GithubService {
     return this.api('GET', `/repos/${owner}/${repo}/pulls/${n}`);
   }
 
-  async setStatus(owner: string, repo: string, sha: string, state: 'pending' | 'success' | 'failure' | 'error', description: string, targetUrl?: string): Promise<void> {
-    await this.api('POST', `/repos/${owner}/${repo}/statuses/${sha}`, { state, context: 'sentinelops', description: description.slice(0, 140), target_url: targetUrl });
+  async setStatus(
+    owner: string,
+    repo: string,
+    sha: string,
+    state: 'pending' | 'success' | 'failure' | 'error',
+    description: string,
+    targetUrl?: string,
+  ): Promise<void> {
+    await this.api('POST', `/repos/${owner}/${repo}/statuses/${sha}`, {
+      state,
+      context: 'sentinelops',
+      description: description.slice(0, 140),
+      target_url: targetUrl,
+    });
   }
 
   /** "admin" | "maintain" | "write" | "triage" | "read" | "none" */
   async permission(owner: string, repo: string, user: string): Promise<string> {
     try {
-      const r = await this.api<{ permission: string; role_name?: string }>('GET', `/repos/${owner}/${repo}/collaborators/${encodeURIComponent(user)}/permission`);
+      const r = await this.api<{ permission: string; role_name?: string }>(
+        'GET',
+        `/repos/${owner}/${repo}/collaborators/${encodeURIComponent(user)}/permission`,
+      );
       return r.role_name === 'maintain' ? 'maintain' : r.permission;
     } catch (e) {
       if (e instanceof GithubError && e.status === 404) return 'none';
@@ -107,18 +125,34 @@ export class GithubService {
     if (!opts.branch.startsWith('sentinelops/')) throw new Error('fix branches must live under sentinelops/');
     if (opts.branch === opts.base) throw new Error('refusing to write to the base branch');
     if (!opts.files.length) throw new Error('no files to commit');
-    const base = await this.api<{ object: { sha: string } }>('GET', `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(opts.base)}`);
+    const base = await this.api<{ object: { sha: string } }>(
+      'GET',
+      `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(opts.base)}`,
+    );
     const baseSha = base.object.sha;
     const baseCommit = await this.api<{ tree: { sha: string } }>('GET', `/repos/${owner}/${repo}/git/commits/${baseSha}`);
     const tree = [];
     for (const f of opts.files) {
-      const blob = await this.api<{ sha: string }>('POST', `/repos/${owner}/${repo}/git/blobs`, { content: Buffer.from(f.content).toString('base64'), encoding: 'base64' });
+      const blob = await this.api<{ sha: string }>('POST', `/repos/${owner}/${repo}/git/blobs`, {
+        content: Buffer.from(f.content).toString('base64'),
+        encoding: 'base64',
+      });
       tree.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha });
     }
     const newTree = await this.api<{ sha: string }>('POST', `/repos/${owner}/${repo}/git/trees`, { base_tree: baseCommit.tree.sha, tree });
-    const commit = await this.api<{ sha: string }>('POST', `/repos/${owner}/${repo}/git/commits`, { message: opts.title, tree: newTree.sha, parents: [baseSha] });
+    const commit = await this.api<{ sha: string }>('POST', `/repos/${owner}/${repo}/git/commits`, {
+      message: opts.title,
+      tree: newTree.sha,
+      parents: [baseSha],
+    });
     await this.api('POST', `/repos/${owner}/${repo}/git/refs`, { ref: `refs/heads/${opts.branch}`, sha: commit.sha });
-    const pr = await this.api<{ number: number; html_url: string }>('POST', `/repos/${owner}/${repo}/pulls`, { title: opts.title, head: opts.branch, base: opts.base, body: opts.body, draft: opts.draft });
+    const pr = await this.api<{ number: number; html_url: string }>('POST', `/repos/${owner}/${repo}/pulls`, {
+      title: opts.title,
+      head: opts.branch,
+      base: opts.base,
+      body: opts.body,
+      draft: opts.draft,
+    });
     return { number: pr.number, url: pr.html_url, branch: opts.branch };
   }
 

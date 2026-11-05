@@ -37,10 +37,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     osv: env.SENTINELOPS_OSV !== '0',
     external: env.SENTINELOPS_EXTERNAL !== '0',
     llm: {
-      baseUrl: (
-        env.SENTINELOPS_LLM_BASE_URL ||
-        (openai ? 'https://api.openai.com/v1' : 'https://api.groq.com/openai/v1')
-      ).replace(/\/$/, ''),
+      baseUrl: (env.SENTINELOPS_LLM_BASE_URL || (openai ? 'https://api.openai.com/v1' : 'https://api.groq.com/openai/v1')).replace(
+        /\/$/,
+        '',
+      ),
       apiKey: env.SENTINELOPS_LLM_API_KEY || env.GROQ_API_KEY || env.OPENAI_API_KEY || '',
       model: env.SENTINELOPS_LLM_MODEL || (openai ? 'gpt-4o-mini' : 'llama-3.3-70b-versatile'),
       maxSteps: int(env.SENTINELOPS_LLM_MAX_STEPS, 8),

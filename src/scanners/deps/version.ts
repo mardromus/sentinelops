@@ -3,7 +3,10 @@
  * "1.2.3" < "1.2.10", "1.0.0-beta.1" < "1.0.0", "2.0" == "2.0.0".
  */
 function parts(v: string): { nums: number[]; pre: string } {
-  const clean = v.trim().replace(/^[v=]+/, '').split('+')[0];
+  const clean = v
+    .trim()
+    .replace(/^[v=]+/, '')
+    .split('+')[0];
   const m = /^(\d+(?:\.\d+)*)(.*)$/.exec(clean);
   if (!m) return { nums: [0], pre: clean };
   const nums = m[1].split('.').map((n) => parseInt(n, 10));

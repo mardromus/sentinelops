@@ -22,7 +22,15 @@ export interface StoredScan {
   result: ScanResult;
   agent?: AgentReport;
   gate: { pass: boolean; failOn: Severity; blocking: number };
-  summary: { total: number; active: number; suppressed: number; bySeverity: Record<string, number>; byPriority: Record<string, number>; byCategory: Record<string, number>; riskScore: number };
+  summary: {
+    total: number;
+    active: number;
+    suppressed: number;
+    bySeverity: Record<string, number>;
+    byPriority: Record<string, number>;
+    byCategory: Record<string, number>;
+    riskScore: number;
+  };
   diff?: { introduced: number; fixed: number; previousId: string };
   source: ScanSource;
   createdAt: string;

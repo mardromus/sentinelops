@@ -51,7 +51,17 @@ export class PipelineService {
     const raw = await this.scanners.scan({ ...opts, osv: opts.osv ?? this.config.osv, external: opts.external ?? this.config.external });
     const result = this.triage.triage(raw, opts.baseline === false ? { baseline: [] } : {});
     const ws = diskWorkspace(result.root);
-    this.audit.append({ actor: 'system', action: 'scan', target: result.id, details: { root: result.root, source, findings: result.findings.length, scanners: result.scanners.map((s) => `${s.name}:${s.status}`) } });
+    this.audit.append({
+      actor: 'system',
+      action: 'scan',
+      target: result.id,
+      details: {
+        root: result.root,
+        source,
+        findings: result.findings.length,
+        scanners: result.scanners.map((s) => `${s.name}:${s.status}`),
+      },
+    });
 
     if (opts.fix && opts.fix !== 'none') await this.remediation.proposeAll(result, ws);
 
@@ -89,7 +99,12 @@ export class PipelineService {
       const targets = result.findings.filter((f) => !f.suppressed && f.fix?.verified);
       const res = await this.remediation.apply(targets, diskWorkspace(root));
       // a human asked for this (CLI --fix / API call), so it is recorded as a human action
-      this.audit.append({ actor: 'human', action: 'fix:apply', target: result.id, details: { root, applied: res.applied.map((p) => p.findingId), skipped: res.skipped.length } });
+      this.audit.append({
+        actor: 'human',
+        action: 'fix:apply',
+        target: result.id,
+        details: { root, applied: res.applied.map((p) => p.findingId), skipped: res.skipped.length },
+      });
       applied = { ...res, root };
     }
 

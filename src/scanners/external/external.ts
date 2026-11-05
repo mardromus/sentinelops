@@ -40,13 +40,9 @@ const sev = (s: string | undefined, fallback: Severity = 'medium'): Severity => 
   return fallback;
 };
 const cwes = (xs: unknown): string[] =>
-  (Array.isArray(xs) ? xs : xs ? [xs] : [])
-    .map((x) => /CWE-\d+/.exec(String(x))?.[0])
-    .filter((x): x is string => !!x);
+  (Array.isArray(xs) ? xs : xs ? [xs] : []).map((x) => /CWE-\d+/.exec(String(x))?.[0]).filter((x): x is string => !!x);
 const owasps = (xs: unknown): string[] =>
-  (Array.isArray(xs) ? xs : xs ? [xs] : [])
-    .map((x) => /A(\d{2}):2021/.exec(String(x))?.[0])
-    .filter((x): x is string => !!x);
+  (Array.isArray(xs) ? xs : xs ? [xs] : []).map((x) => /A(\d{2}):2021/.exec(String(x))?.[0]).filter((x): x is string => !!x);
 
 export function parseSemgrep(json: string, root: string): Finding[] {
   const doc = JSON.parse(json || '{}');
@@ -60,7 +56,14 @@ export function parseSemgrep(json: string, root: string): Finding[] {
       confidence: sev(r.extra?.metadata?.confidence, 'medium') === 'high' ? 'high' : 'medium',
       cwe: cwes(r.extra?.metadata?.cwe),
       owasp: owasps(r.extra?.metadata?.owasp),
-      location: { file: relative(root, r.path) || r.path, line: r.start?.line || 1, endLine: r.end?.line, snippet: String(r.extra?.lines || '').trim().slice(0, 240) },
+      location: {
+        file: relative(root, r.path) || r.path,
+        line: r.start?.line || 1,
+        endLine: r.end?.line,
+        snippet: String(r.extra?.lines || '')
+          .trim()
+          .slice(0, 240),
+      },
       scanner: 'semgrep',
       references: r.extra?.metadata?.references,
     }),
@@ -78,7 +81,13 @@ export function parseGitleaks(json: string): Finding[] {
       severity: 'high',
       confidence: 'high',
       cwe: ['CWE-798'],
-      location: { file: r.File, line: r.StartLine || 1, snippet: String(r.Match || '').replace(r.Secret || '\u0000', '****').slice(0, 240) },
+      location: {
+        file: r.File,
+        line: r.StartLine || 1,
+        snippet: String(r.Match || '')
+          .replace(r.Secret || '\u0000', '****')
+          .slice(0, 240),
+      },
       scanner: 'gitleaks',
       remediation: 'Revoke and rotate the credential, then remove it from history.',
     }),
@@ -158,8 +167,26 @@ export class ExternalScanner implements Scanner {
 
 export function externalScanners(runner?: Runner): ExternalScanner[] {
   return [
-    new ExternalScanner('semgrep', 'semgrep', () => ['scan', '--config', 'p/owasp-top-ten', '--json', '--quiet', '--metrics=off', '.'], parseSemgrep, runner),
-    new ExternalScanner('gitleaks', 'gitleaks', () => ['detect', '--source', '.', '--report-format', 'json', '--report-path', '/dev/stdout', '--no-banner', '--exit-code', '0'], (s) => parseGitleaks(s), runner),
-    new ExternalScanner('trivy', 'trivy', () => ['fs', '--format', 'json', '--quiet', '--scanners', 'vuln,misconfig', '.'], (s) => parseTrivy(s), runner),
+    new ExternalScanner(
+      'semgrep',
+      'semgrep',
+      () => ['scan', '--config', 'p/owasp-top-ten', '--json', '--quiet', '--metrics=off', '.'],
+      parseSemgrep,
+      runner,
+    ),
+    new ExternalScanner(
+      'gitleaks',
+      'gitleaks',
+      () => ['detect', '--source', '.', '--report-format', 'json', '--report-path', '/dev/stdout', '--no-banner', '--exit-code', '0'],
+      (s) => parseGitleaks(s),
+      runner,
+    ),
+    new ExternalScanner(
+      'trivy',
+      'trivy',
+      () => ['fs', '--format', 'json', '--quiet', '--scanners', 'vuln,misconfig', '.'],
+      (s) => parseTrivy(s),
+      runner,
+    ),
   ];
 }

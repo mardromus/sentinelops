@@ -27,13 +27,59 @@ function finding(over: Partial<Parameters<typeof makeFinding>[0]>): Finding {
 
 function scan(): ScanResult {
   const a = finding({});
-  a.fix = { findingId: a.id, strategy: 'rule', description: 'Parameterised the SQL query.', file: 'src/app.js', diff: '--- a/src/app.js\n+++ b/src/app.js\n@@ -7,1 +7,1 @@\n-db.query("x" + id)\n+db.query("x ?", [id])\n', verified: true };
-  const b = finding({ ruleId: 'js.xss.reflected-response', title: 'XSS </script><script>alert(1)</script>', severity: 'high', cwe: ['CWE-79'], location: { file: 'src/app.js', line: 9, snippet: 'res.send(`<b>${req.query.n}</b>`) </script>' } });
-  const c = finding({ ruleId: 'dep.CVE-2021-23337', title: 'lodash@4.17.15: Command injection', category: 'dependency', severity: 'high', cwe: ['CWE-94'], owasp: ['A06:2021'], location: { file: 'package-lock.json', line: 12, snippet: 'lodash@4.17.15' }, package: { name: 'lodash', version: '4.17.15', ecosystem: 'npm', fixedIn: '4.17.21', advisory: 'CVE-2021-23337', aliases: ['CVE-2021-23337'] } });
-  const d = finding({ ruleId: 'js.crypto.weak-hash', title: 'Weak hash', severity: 'medium', cwe: ['CWE-328'], location: { file: 'src/x.js', line: 1, snippet: 'md5' } });
+  a.fix = {
+    findingId: a.id,
+    strategy: 'rule',
+    description: 'Parameterised the SQL query.',
+    file: 'src/app.js',
+    diff: '--- a/src/app.js\n+++ b/src/app.js\n@@ -7,1 +7,1 @@\n-db.query("x" + id)\n+db.query("x ?", [id])\n',
+    verified: true,
+  };
+  const b = finding({
+    ruleId: 'js.xss.reflected-response',
+    title: 'XSS </script><script>alert(1)</script>',
+    severity: 'high',
+    cwe: ['CWE-79'],
+    location: { file: 'src/app.js', line: 9, snippet: 'res.send(`<b>${req.query.n}</b>`) </script>' },
+  });
+  const c = finding({
+    ruleId: 'dep.CVE-2021-23337',
+    title: 'lodash@4.17.15: Command injection',
+    category: 'dependency',
+    severity: 'high',
+    cwe: ['CWE-94'],
+    owasp: ['A06:2021'],
+    location: { file: 'package-lock.json', line: 12, snippet: 'lodash@4.17.15' },
+    package: {
+      name: 'lodash',
+      version: '4.17.15',
+      ecosystem: 'npm',
+      fixedIn: '4.17.21',
+      advisory: 'CVE-2021-23337',
+      aliases: ['CVE-2021-23337'],
+    },
+  });
+  const d = finding({
+    ruleId: 'js.crypto.weak-hash',
+    title: 'Weak hash',
+    severity: 'medium',
+    cwe: ['CWE-328'],
+    location: { file: 'src/x.js', line: 1, snippet: 'md5' },
+  });
   d.suppressed = true;
   d.suppressReason = 'inline sentinelops-ignore';
-  const r: ScanResult = { id: '0123456789abcdef', root: '/repo/shop', startedAt: '2026-11-05T06:00:00.000Z', finishedAt: '2026-11-05T06:00:01.000Z', filesScanned: 12, findings: [a, b, c, d], scanners: [{ name: 'builtin-sast', status: 'ok', findings: 3, durationMs: 4 }, { name: 'semgrep', status: 'skipped', findings: 0, durationMs: 0, detail: 'not installed' }] };
+  const r: ScanResult = {
+    id: '0123456789abcdef',
+    root: '/repo/shop',
+    startedAt: '2026-11-05T06:00:00.000Z',
+    finishedAt: '2026-11-05T06:00:01.000Z',
+    filesScanned: 12,
+    findings: [a, b, c, d],
+    scanners: [
+      { name: 'builtin-sast', status: 'ok', findings: 3, durationMs: 4 },
+      { name: 'semgrep', status: 'skipped', findings: 0, durationMs: 0, detail: 'not installed' },
+    ],
+  };
   return new TriageService().triage(r, { baseline: [] });
 }
 
@@ -48,8 +94,13 @@ describe('SARIF', () => {
     expect(sqli.level).toBe('error');
     expect(run.tool.driver.rules[sqli.ruleIndex].id).toBe(sqli.ruleId);
     expect(run.tool.driver.rules[sqli.ruleIndex].properties['security-severity']).toBe('9.5');
-    expect(run.tool.driver.rules[sqli.ruleIndex].properties.tags).toEqual(expect.arrayContaining(['external/cwe/cwe-89', 'owasp-a03:2021']));
-    expect(sqli.locations[0].physicalLocation).toMatchObject({ artifactLocation: { uri: 'src/app.js', uriBaseId: '%SRCROOT%' }, region: { startLine: 7 } });
+    expect(run.tool.driver.rules[sqli.ruleIndex].properties.tags).toEqual(
+      expect.arrayContaining(['external/cwe/cwe-89', 'owasp-a03:2021']),
+    );
+    expect(sqli.locations[0].physicalLocation).toMatchObject({
+      artifactLocation: { uri: 'src/app.js', uriBaseId: '%SRCROOT%' },
+      region: { startLine: 7 },
+    });
     expect(sqli.partialFingerprints['sentinelops/v1']).toHaveLength(64);
     expect(sqli.message.text).toContain('verified fix');
     const sup = run.results.find((r: any) => r.ruleId === 'js.crypto.weak-hash');

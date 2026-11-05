@@ -57,11 +57,29 @@ describe('config scanner', () => {
   it('checks compose and kubernetes manifests', async () => {
     const compose = file(
       'docker-compose.yml',
-      ['services:', '  app:', '    privileged: true', '    network_mode: host', '    volumes:', '      - /var/run/docker.sock:/var/run/docker.sock'].join('\n'),
+      [
+        'services:',
+        '  app:',
+        '    privileged: true',
+        '    network_mode: host',
+        '    volumes:',
+        '      - /var/run/docker.sock:/var/run/docker.sock',
+      ].join('\n'),
     );
     const k8s = file(
       'k8s/deploy.yaml',
-      ['apiVersion: apps/v1', 'kind: Deployment', 'spec:', '  template:', '    spec:', '      hostNetwork: true', '      containers:', '        - securityContext:', '            allowPrivilegeEscalation: true', '            runAsUser: 0'].join('\n'),
+      [
+        'apiVersion: apps/v1',
+        'kind: Deployment',
+        'spec:',
+        '  template:',
+        '    spec:',
+        '      hostNetwork: true',
+        '      containers:',
+        '        - securityContext:',
+        '            allowPrivilegeEscalation: true',
+        '            runAsUser: 0',
+      ].join('\n'),
     );
     const other = file('config/app.yaml', 'privileged: true\n'); // not a container manifest
     expect(ids(await scan(compose, k8s, other))).toEqual([

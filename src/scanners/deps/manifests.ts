@@ -21,7 +21,9 @@ export function parsePackageLock(file: SourceFile): Dependency[] {
     return [];
   }
   const out: Dependency[] = [];
-  const directNames = new Set<string>(Object.keys({ ...(doc.packages?.['']?.dependencies || {}), ...(doc.packages?.['']?.devDependencies || {}) }));
+  const directNames = new Set<string>(
+    Object.keys({ ...(doc.packages?.['']?.dependencies || {}), ...(doc.packages?.['']?.devDependencies || {}) }),
+  );
   if (doc.packages) {
     for (const [path, meta] of Object.entries<any>(doc.packages)) {
       if (!path || !meta?.version || meta.link) continue;
@@ -69,7 +71,10 @@ export function parsePackageJson(file: SourceFile): Dependency[] {
     return [];
   }
   const out: Dependency[] = [];
-  for (const [section, dev] of [['dependencies', false], ['devDependencies', true]] as const) {
+  for (const [section, dev] of [
+    ['dependencies', false],
+    ['devDependencies', true],
+  ] as const) {
     for (const [name, spec] of Object.entries<string>(doc[section] || {})) {
       if (typeof spec !== 'string' || /^(file:|link:|git|http|workspace:)/.test(spec)) continue;
       const version = minVersionOf(spec);

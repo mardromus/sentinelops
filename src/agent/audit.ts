@@ -42,7 +42,14 @@ export class AuditLog {
     }
   }
 
-  append(e: { actor: AuditEntry['actor']; action: string; target?: string; allowed?: boolean; reason?: string; details?: Record<string, unknown> }): AuditEntry {
+  append(e: {
+    actor: AuditEntry['actor'];
+    action: string;
+    target?: string;
+    allowed?: boolean;
+    reason?: string;
+    details?: Record<string, unknown>;
+  }): AuditEntry {
     const last = this.entries[this.entries.length - 1];
     const base = { seq: (last?.seq ?? 0) + 1, ts: new Date().toISOString(), ...e, prev: last?.hash ?? GENESIS };
     const entry: AuditEntry = { ...base, hash: digest(base) };

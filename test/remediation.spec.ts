@@ -42,7 +42,13 @@ const APP = [
   '',
 ].join('\n');
 
-const file = (path: string, content: string): SourceFile => ({ path, absPath: path, content, lines: content.split('\n'), language: languageOf(path) });
+const file = (path: string, content: string): SourceFile => ({
+  path,
+  absPath: path,
+  content,
+  lines: content.split('\n'),
+  language: languageOf(path),
+});
 async function findingsFor(scanner: Scanner, path: string, content: string): Promise<Finding[]> {
   const k = new KnowledgeService();
   return (await scanner.scan({ options: { root: '.', osv: false }, files: [file(path, content)] })).map((f) => k.enrich(f));
@@ -93,7 +99,13 @@ describe('rule fixers', () => {
   });
 
   it('uses $n placeholders for node-postgres and supports TypeScript helpers', async () => {
-    const src = ["import { Pool } from 'pg';", 'const pool = new Pool();', 'export const byId = (req: any) => pool.query(`SELECT * FROM t WHERE a = ${req.query.a} AND b = ${req.query.b}`);', "export const hi = (req: any, res: any) => res.send(`<p>${req.query.n}</p>`);", ''].join('\n');
+    const src = [
+      "import { Pool } from 'pg';",
+      'const pool = new Pool();',
+      'export const byId = (req: any) => pool.query(`SELECT * FROM t WHERE a = ${req.query.a} AND b = ${req.query.b}`);',
+      'export const hi = (req: any, res: any) => res.send(`<p>${req.query.n}</p>`);',
+      '',
+    ].join('\n');
     const fs = await findingsFor(new SastScanner(), 'src/q.ts', src);
     const ws = memoryWorkspace({ 'src/q.ts': src });
     const res = await svc.apply(fs, ws);
@@ -109,7 +121,14 @@ describe('rule fixers', () => {
   });
 
   it('fixes python findings', async () => {
-    const src = ['import sqlite3, yaml, requests', 'cur.execute(f"SELECT * FROM users WHERE name = \'{name}\'")', 'cfg = yaml.load(text)', 'requests.get(url, verify=False)', 'app.run(debug=True)', ''].join('\n');
+    const src = [
+      'import sqlite3, yaml, requests',
+      'cur.execute(f"SELECT * FROM users WHERE name = \'{name}\'")',
+      'cfg = yaml.load(text)',
+      'requests.get(url, verify=False)',
+      'app.run(debug=True)',
+      '',
+    ].join('\n');
     const fs = await findingsFor(new SastScanner(), 'app.py', src);
     const ws = memoryWorkspace({ 'app.py': src });
     const res = await svc.apply(fs, ws);
@@ -190,12 +209,16 @@ describe('more fixers', () => {
       '  exec(`convert ${req.body.image} -resize 200x200 thumb.png`, (err) => {',
       '    if (err) return res.status(500).send(err.message);',
       '  });',
-      "  db.query(\"UPDATE users SET token = '\" + tok + \"' WHERE email = '\" + req.body.email + \"'\", () => res.json({}));",
+      '  db.query("UPDATE users SET token = \'" + tok + "\' WHERE email = \'" + req.body.email + "\'", () => res.json({}));',
       '});',
       '',
     ].join('\n');
     const fs = await findingsFor(new SastScanner(), 'src/r.js', src);
-    expect(fs.map((f) => f.ruleId).sort()).toEqual(['js.cmdi.shell-command-from-input', 'js.error.stack-trace-exposed', 'js.sqli.string-built-query']);
+    expect(fs.map((f) => f.ruleId).sort()).toEqual([
+      'js.cmdi.shell-command-from-input',
+      'js.error.stack-trace-exposed',
+      'js.sqli.string-built-query',
+    ]);
     const ws = memoryWorkspace({ 'src/r.js': src });
     const res = await svc.apply(fs, ws);
     expect(res.skipped).toEqual([]);
@@ -246,7 +269,12 @@ describe('more fixers', () => {
     const res = await svc.apply(fs, ws);
     expect(res.applied).toHaveLength(1); // the multi-line block is left to a human
     expect(ws.files['.github/workflows/ci.yml']).toContain(
-      ['      - run: echo "Building $PR_TITLE from $HEAD_REF"', '        env:', '          PR_TITLE: ${{ github.event.pull_request.title }}', '          HEAD_REF: ${{ github.head_ref }}'].join('\n'),
+      [
+        '      - run: echo "Building $PR_TITLE from $HEAD_REF"',
+        '        env:',
+        '          PR_TITLE: ${{ github.event.pull_request.title }}',
+        '          HEAD_REF: ${{ github.head_ref }}',
+      ].join('\n'),
     );
   });
 

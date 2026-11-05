@@ -104,7 +104,12 @@ describe('dependency scanner', () => {
           aliases: ['CVE-2099-0001'],
           summary: 'Test advisory',
           database_specific: { severity: 'HIGH', cwe_ids: ['CWE-79'] },
-          affected: [{ package: { name: 'lodash', ecosystem: 'npm' }, ranges: [{ type: 'SEMVER', events: [{ introduced: '0' }, { fixed: '4.18.0' }] }] }],
+          affected: [
+            {
+              package: { name: 'lodash', ecosystem: 'npm' },
+              ranges: [{ type: 'SEMVER', events: [{ introduced: '0' }, { fixed: '4.18.0' }] }],
+            },
+          ],
         }),
       };
     };
@@ -115,7 +120,9 @@ describe('dependency scanner', () => {
     expect(fs[0]).toMatchObject({ severity: 'high', cwe: ['CWE-79'] });
     expect(fs[0].package!.fixedIn).toBe('4.18.0');
 
-    const broken = new DependencyScanner(new OsvClient('https://osv.test', async () => ({ ok: false, status: 503, json: async () => ({}) })));
+    const broken = new DependencyScanner(
+      new OsvClient('https://osv.test', async () => ({ ok: false, status: 503, json: async () => ({}) })),
+    );
     const off = await broken.scan({ options: { root: '/x' }, files: [file('package-lock.json', LOCK)] });
     expect(broken.lastSource).toBe('offline');
     expect(off.length).toBe(4);
@@ -125,7 +132,15 @@ describe('dependency scanner', () => {
     expect(severityFromOsv({ database_specific: { severity: 'MODERATE' } })).toBe('medium');
     expect(severityFromOsv({ severity: [{ type: 'CVSS_V3', score: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H' }] })).toBe('critical');
     const adv = advisoryFromOsv(
-      { id: 'X', affected: [{ package: { name: 'a' }, ranges: [{ type: 'ECOSYSTEM', events: [{ introduced: '1.0' }, { fixed: '1.5' }, { introduced: '2.0' }] }] }] },
+      {
+        id: 'X',
+        affected: [
+          {
+            package: { name: 'a' },
+            ranges: [{ type: 'ECOSYSTEM', events: [{ introduced: '1.0' }, { fixed: '1.5' }, { introduced: '2.0' }] }],
+          },
+        ],
+      },
       { name: 'a', version: '1.1', ecosystem: 'npm' },
     );
     expect(adv.ranges).toEqual([{ introduced: '1.0', fixed: '1.5' }, { introduced: '2.0' }]);

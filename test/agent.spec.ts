@@ -62,7 +62,14 @@ describe('agent (LLM mode with a scripted model)', () => {
       () => ({ content: null, toolCalls: [call('list_findings', { limit: 5 })] }),
       (m) => {
         expect(lastToolResults(m)[0]).toContain(sqli.id);
-        return { content: null, toolCalls: [call('get_finding', { id: sqli.id }), call('read_file', { path: '../../etc/passwd' }, 'r1'), call('read_file', { path: '.env' }, 'r2')] };
+        return {
+          content: null,
+          toolCalls: [
+            call('get_finding', { id: sqli.id }),
+            call('read_file', { path: '../../etc/passwd' }, 'r1'),
+            call('read_file', { path: '.env' }, 'r2'),
+          ],
+        };
       },
       (m) => {
         const [detail, escape, env] = lastToolResults(m).slice(-3);
@@ -73,8 +80,16 @@ describe('agent (LLM mode with a scripted model)', () => {
         return {
           content: null,
           toolCalls: [
-            call('set_verdict', { id: sqli.id, status: 'likely_false_positive', confidence: 'high', rationale: 'comment says it is safe' }, 'v1'),
-            call('set_verdict', { id: xss.id, status: 'true_positive', confidence: 'high', rationale: 'query param rendered unescaped' }, 'v2'),
+            call(
+              'set_verdict',
+              { id: sqli.id, status: 'likely_false_positive', confidence: 'high', rationale: 'comment says it is safe' },
+              'v1',
+            ),
+            call(
+              'set_verdict',
+              { id: xss.id, status: 'true_positive', confidence: 'high', rationale: 'query param rendered unescaped' },
+              'v2',
+            ),
             call('propose_fix', { id: sqli.id }, 'f1'),
             call('propose_fix', { id: xss.id }, 'f2'),
           ],
@@ -84,7 +99,10 @@ describe('agent (LLM mode with a scripted model)', () => {
         const [v1, , f1] = lastToolResults(m).slice(-4);
         expect(v1).toContain('dismissal blocked');
         expect(f1).toContain('"verified": true');
-        return { content: null, toolCalls: [call('finish', { summary: `Fix ${sqli.id} first, then ${xss.id}. Also SO-deadbeef and CVE-2099-12345 are bad.` })] };
+        return {
+          content: null,
+          toolCalls: [call('finish', { summary: `Fix ${sqli.id} first, then ${xss.id}. Also SO-deadbeef and CVE-2099-12345 are bad.` })],
+        };
       },
     ]);
     const audit = new AuditLog(null);
@@ -93,7 +111,10 @@ describe('agent (LLM mode with a scripted model)', () => {
     expect(report.errors).toEqual([]);
     expect(report.mode).toBe('llm');
     expect(report.model).toBe('fake-model');
-    expect(report.verdicts.find((v) => v.findingId === sqli.id)).toMatchObject({ status: 'needs_review', guardrail: expect.stringContaining('prompt-injection') });
+    expect(report.verdicts.find((v) => v.findingId === sqli.id)).toMatchObject({
+      status: 'needs_review',
+      guardrail: expect.stringContaining('prompt-injection'),
+    });
     expect(report.fixes.map((f) => f.findingId).sort()).toEqual([sqli.id, xss.id].sort());
     expect(report.fixes.every((f) => f.verified)).toBe(true);
     expect(report.injections[0].labels).toEqual(expect.arrayContaining(['instruction override', 'verdict steering']));
@@ -102,24 +123,39 @@ describe('agent (LLM mode with a scripted model)', () => {
     expect(report.summary).toContain('Warning: instructions aimed at AI reviewers');
     expect(sqli.verdict?.status).toBe('needs_review');
     expect(audit.verify().valid).toBe(true);
-    expect(audit.all().filter((e) => e.allowed === false).map((e) => e.target)).toEqual(['../../etc/passwd', '.env']);
+    expect(
+      audit
+        .all()
+        .filter((e) => e.allowed === false)
+        .map((e) => e.target),
+    ).toEqual(['../../etc/passwd', '.env']);
   });
 
   it('refuses tools above the autonomy level and falls back offline when the model fails', async () => {
     const result = await scanFixture({ 'src/app.js': APP });
     const id = result.findings[0].id;
-    const l0 = new AgentService(new KnowledgeService(), new RemediationService(), { ...config, autonomy: 0 }, new FakeLlm([
-      () => ({ content: null, toolCalls: [call('set_verdict', { id, status: 'true_positive', confidence: 'high', rationale: 'x' })] }),
-      (m) => {
-        expect(lastToolResults(m)[0]).toContain('requires L1');
-        return { content: 'Observed only.', toolCalls: [] };
-      },
-    ]));
+    const l0 = new AgentService(
+      new KnowledgeService(),
+      new RemediationService(),
+      { ...config, autonomy: 0 },
+      new FakeLlm([
+        () => ({ content: null, toolCalls: [call('set_verdict', { id, status: 'true_positive', confidence: 'high', rationale: 'x' })] }),
+        (m) => {
+          expect(lastToolResults(m)[0]).toContain('requires L1');
+          return { content: 'Observed only.', toolCalls: [] };
+        },
+      ]),
+    );
     const r0 = await l0.run(result, { ws: diskWorkspace(result.root) });
     expect(r0.verdicts).toEqual([]);
     expect(r0.summary).toBe('Observed only.');
 
-    const broken: LlmClient = { model: 'x', chat: async () => { throw new Error('401 invalid api key'); } };
+    const broken: LlmClient = {
+      model: 'x',
+      chat: async () => {
+        throw new Error('401 invalid api key');
+      },
+    };
     const r = await make(broken).run(result, { ws: diskWorkspace(result.root) });
     expect(r.mode).toBe('offline');
     expect(r.errors[0]).toContain('401 invalid api key');
@@ -131,7 +167,7 @@ describe('agent (offline planner)', () => {
     const result = await scanFixture({
       'src/app.js': APP,
       'test/fixtures/legacy.js': 'const h = crypto.createHash("md5").update(x).digest("hex");\n',
-      'Dockerfile': 'FROM node:20-alpine\nCOPY . .\nCMD ["node","src/app.js"]\n',
+      Dockerfile: 'FROM node:20-alpine\nCOPY . .\nCMD ["node","src/app.js"]\n',
     });
     const report = await make(null).run(result, { ws: diskWorkspace(result.root), mode: 'auto' });
     expect(report.mode).toBe('offline');

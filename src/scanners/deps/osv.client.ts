@@ -14,7 +14,10 @@ export interface OsvQuery {
   ecosystem: 'npm' | 'PyPI';
 }
 
-export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal }) => Promise<{ ok: boolean; status: number; json(): Promise<any> }>;
+export type FetchLike = (
+  url: string,
+  init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal },
+) => Promise<{ ok: boolean; status: number; json(): Promise<any> }>;
 
 const SEV: Record<string, Severity> = { CRITICAL: 'critical', HIGH: 'high', MODERATE: 'medium', MEDIUM: 'medium', LOW: 'low' };
 
@@ -69,7 +72,7 @@ export class OsvClient {
 
   constructor(
     private readonly base = 'https://api.osv.dev',
-    private readonly http: FetchLike = (globalThis.fetch as unknown as FetchLike),
+    private readonly http: FetchLike = globalThis.fetch as unknown as FetchLike,
     private readonly timeoutMs = 15000,
   ) {}
 

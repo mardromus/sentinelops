@@ -5,7 +5,7 @@ import { APP_CONFIG, AppConfig } from '../config/config';
 import { JobsService } from '../github/jobs.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { AuditService } from '../pipeline/audit.service';
-import { fixerFor } from '../remediation/fixers';
+import { hasFixer } from '../remediation/fixers';
 import { assetPath } from '../reports/html';
 import { TOOL_VERSION } from '../reports/sarif';
 import { RULES } from '../scanners/sast/rules';
@@ -23,7 +23,10 @@ export class SystemController {
 
   @Get()
   @Header('content-type', 'text/html; charset=utf-8')
-  @Header('content-security-policy', "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-src 'self'; img-src 'self' data:")
+  @Header(
+    'content-security-policy',
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-src 'self'; img-src 'self' data:",
+  )
   dashboard() {
     return readFileSync(assetPath('dashboard.html'), 'utf8');
   }
@@ -34,7 +37,9 @@ export class SystemController {
       status: 'ok',
       version: TOOL_VERSION,
       autonomy: `L${this.config.autonomy} ${LEVEL_NAMES[this.config.autonomy]}`,
-      llm: this.config.llm.apiKey ? { configured: true, model: this.config.llm.model, baseUrl: this.config.llm.baseUrl } : { configured: false, mode: 'offline planner' },
+      llm: this.config.llm.apiKey
+        ? { configured: true, model: this.config.llm.model, baseUrl: this.config.llm.baseUrl }
+        : { configured: false, mode: 'offline planner' },
       github: { token: !!this.config.github.token, webhook: !!this.config.github.webhookSecret },
       scanners: this.scanners.list(),
       osv: this.config.osv,
@@ -50,8 +55,16 @@ export class SystemController {
   rules() {
     return RULES.map((r) => {
       const owasp = [...new Set(r.cwe.map((c) => this.knowledge.cwe(c)?.owasp).filter(Boolean))];
-      const probe = { ruleId: r.id, category: 'sast' } as any;
-      return { id: r.id, title: r.title, severity: r.severity, confidence: r.confidence, languages: r.languages, cwe: r.cwe, owasp, autofix: !!fixerFor(probe) };
+      return {
+        id: r.id,
+        title: r.title,
+        severity: r.severity,
+        confidence: r.confidence,
+        languages: r.languages,
+        cwe: r.cwe,
+        owasp,
+        autofix: hasFixer(r.id),
+      };
     });
   }
 

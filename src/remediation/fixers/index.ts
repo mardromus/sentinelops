@@ -60,10 +60,18 @@ const CONFIG_FIXER: Record<string, string> = {
   'config.gha.script-injection': 'gha-env-indirection',
 };
 
+/** Does a rule have a deterministic fixer? (catalogue listings) */
+export function hasFixer(ruleId: string): boolean {
+  return RULE_FIXER.has(ruleId) || ruleId in CONFIG_FIXER;
+}
+
 /** Which fixer handles a finding, and which file it edits. */
 export function fixerFor(f: Finding): { id: string; file: string } | null {
   if (f.category === 'dependency') return f.package?.fixedIn ? { id: 'dependency-bump', file: manifestFor(f.location.file) } : null;
-  if (f.category === 'secret') return f.ruleId === 'secret.private-key' || f.ruleId === 'secret.env-file-value' ? null : { id: 'secret-to-env', file: f.location.file };
+  if (f.category === 'secret')
+    return f.ruleId === 'secret.private-key' || f.ruleId === 'secret.env-file-value'
+      ? null
+      : { id: 'secret-to-env', file: f.location.file };
   const id = RULE_FIXER.get(f.ruleId) || CONFIG_FIXER[f.ruleId];
   return id ? { id, file: f.location.file } : null;
 }

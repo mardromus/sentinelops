@@ -13,7 +13,13 @@ export const TOOL_VERSION = '1.0.0';
 const INFO_URI = 'https://github.com/mardromus/sentinelops';
 
 const SECURITY_SEVERITY: Record<Severity, string> = { critical: '9.5', high: '8.0', medium: '5.5', low: '3.0', info: '0.0' };
-const LEVEL: Record<Severity, 'error' | 'warning' | 'note'> = { critical: 'error', high: 'error', medium: 'warning', low: 'note', info: 'note' };
+const LEVEL: Record<Severity, 'error' | 'warning' | 'note'> = {
+  critical: 'error',
+  high: 'error',
+  medium: 'warning',
+  low: 'note',
+  info: 'note',
+};
 const PRECISION = { high: 'very-high', medium: 'high', low: 'medium' } as const;
 
 function helpText(f: Finding): string {
@@ -41,7 +47,12 @@ export function toSarif(result: ScanResult): object {
       help: { text: helpText(f), markdown: helpText(f).replace(/\n/g, '\n\n') },
       defaultConfiguration: { level: LEVEL[f.severity] },
       properties: {
-        tags: ['security', f.category, ...f.cwe.map((c) => `external/cwe/${c.toLowerCase()}`), ...f.owasp.map((o) => `owasp-${o.toLowerCase()}`)],
+        tags: [
+          'security',
+          f.category,
+          ...f.cwe.map((c) => `external/cwe/${c.toLowerCase()}`),
+          ...f.owasp.map((o) => `owasp-${o.toLowerCase()}`),
+        ],
         'security-severity': SECURITY_SEVERITY[f.severity],
         precision: PRECISION[f.confidence],
         'problem.severity': LEVEL[f.severity] === 'note' ? 'recommendation' : LEVEL[f.severity],
@@ -68,7 +79,9 @@ export function toSarif(result: ScanResult): object {
       },
     ],
     partialFingerprints: { 'sentinelops/v1': f.fingerprint },
-    ...(f.suppressed ? { suppressions: [{ kind: /inline/.test(f.suppressReason || '') ? 'inSource' : 'external', justification: f.suppressReason }] } : {}),
+    ...(f.suppressed
+      ? { suppressions: [{ kind: /inline/.test(f.suppressReason || '') ? 'inSource' : 'external', justification: f.suppressReason }] }
+      : {}),
     properties: {
       id: f.id,
       severity: f.severity,
@@ -98,7 +111,10 @@ export function toSarif(result: ScanResult): object {
             endTimeUtc: result.finishedAt,
             toolExecutionNotifications: result.scanners
               .filter((s) => s.status !== 'ok')
-              .map((s) => ({ level: s.status === 'error' ? 'error' : 'note', message: { text: `${s.name}: ${s.status}${s.detail ? ` (${s.detail})` : ''}` } })),
+              .map((s) => ({
+                level: s.status === 'error' ? 'error' : 'note',
+                message: { text: `${s.name}: ${s.status}${s.detail ? ` (${s.detail})` : ''}` },
+              })),
           },
         ],
         results,

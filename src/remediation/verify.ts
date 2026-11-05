@@ -25,6 +25,8 @@ let ts: any;
 function typescript(): any {
   if (ts === undefined) {
     try {
+      // optional at runtime: typescript is only needed for JS/TS syntax checks
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       ts = require('typescript');
     } catch {
       ts = null;
@@ -46,7 +48,11 @@ export function checkSyntax(path: string, content: string): { status: 'ok' | 'er
   if (lang === 'js' || lang === 'ts') {
     const t = typescript();
     if (t) {
-      const out = t.transpileModule(content, { fileName: path, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: t.JsxEmit?.Preserve } });
+      const out = t.transpileModule(content, {
+        fileName: path,
+        reportDiagnostics: true,
+        compilerOptions: { allowJs: true, jsx: t.JsxEmit?.Preserve },
+      });
       const errs = (out.diagnostics || []).filter((d: any) => d.category === t.DiagnosticCategory.Error);
       return errs.length ? { status: 'error', message: t.flattenDiagnosticMessageText(errs[0].messageText, ' ') } : { status: 'ok' };
     }
@@ -61,7 +67,11 @@ export function checkSyntax(path: string, content: string): { status: 'ok' | 'er
     return { status: 'unchecked' };
   }
   if (lang === 'py') {
-    const r = spawnSync('python3', ['-c', 'import ast,sys; ast.parse(sys.stdin.read())'], { input: content, encoding: 'utf8', timeout: 10000 });
+    const r = spawnSync('python3', ['-c', 'import ast,sys; ast.parse(sys.stdin.read())'], {
+      input: content,
+      encoding: 'utf8',
+      timeout: 10000,
+    });
     if (r.error) return { status: 'unchecked' };
     return r.status === 0 ? { status: 'ok' } : { status: 'error', message: (r.stderr || '').trim().split('\n').pop() };
   }
@@ -86,10 +96,16 @@ export async function verifyFix(f: Finding, path: string, before: string, after:
 
   if (f.category === 'dependency' && f.package) {
     const pkg = f.package;
-    const still = matchOffline({ ...pkg, version: pkg.fixedIn || pkg.version, file: path, line: 1, exact: true }).filter((a) => a.id === pkg.advisory || a.aliases.some((x) => pkg.aliases?.includes(x)));
+    const still = matchOffline({ ...pkg, version: pkg.fixedIn || pkg.version, file: path, line: 1, exact: true }).filter(
+      (a) => a.id === pkg.advisory || a.aliases.some((x) => pkg.aliases?.includes(x)),
+    );
     return still.length
       ? { ok: false, syntax: syntax.status, detail: `${pkg.name}@${pkg.fixedIn} is still affected by ${pkg.advisory}` }
-      : { ok: true, syntax: syntax.status, detail: `${pkg.name}@${pkg.fixedIn} is outside the affected range of ${pkg.advisory}; refresh the lockfile to complete the upgrade` };
+      : {
+          ok: true,
+          syntax: syntax.status,
+          detail: `${pkg.name}@${pkg.fixedIn} is outside the affected range of ${pkg.advisory}; refresh the lockfile to complete the upgrade`,
+        };
   }
 
   const scanner = scannerFor(f);
@@ -97,12 +113,15 @@ export async function verifyFix(f: Finding, path: string, before: string, after:
   const pre = await scanContent(scanner, path, before);
   const post = await scanContent(scanner, path, after);
   const sameRule = (x: Finding) => x.ruleId === f.ruleId;
-  if (post.filter(sameRule).length >= pre.filter(sameRule).length) return { ok: false, syntax: syntax.status, detail: `${f.ruleId} is still reported after the edit` };
+  if (post.filter(sameRule).length >= pre.filter(sameRule).length)
+    return { ok: false, syntax: syntax.status, detail: `${f.ruleId} is still reported after the edit` };
   // compare per-rule counts (fingerprints change whenever a line is edited)
   const count = (xs: Finding[]) => xs.reduce<Record<string, number>>((m, x) => ((m[x.ruleId] = (m[x.ruleId] || 0) + 1), m), {});
   const preCount = count(pre);
   const postCount = count(post);
-  const introduced = post.find((x) => !sameRule(x) && (postCount[x.ruleId] || 0) > (preCount[x.ruleId] || 0) && severityRank(x.severity) >= severityRank(f.severity));
+  const introduced = post.find(
+    (x) => !sameRule(x) && (postCount[x.ruleId] || 0) > (preCount[x.ruleId] || 0) && severityRank(x.severity) >= severityRank(f.severity),
+  );
   if (introduced) return { ok: false, syntax: syntax.status, detail: `the edit introduces ${introduced.ruleId}` };
   return { ok: true, syntax: syntax.status, detail: `re-scan clean for ${f.ruleId}; syntax ${syntax.status}` };
 }

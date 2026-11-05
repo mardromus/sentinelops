@@ -147,7 +147,9 @@ export const pyShellToList: Fixer = ({ finding, content }) => {
   const idx = locate(lines, finding);
   if (idx < 0) return null;
   const line = lines[idx];
-  const m = /\b(subprocess\.(?:run|call|check_call|check_output|Popen))\(\s*(f?)(["'])(.*?)\3\s*,([^)]*)\bshell\s*=\s*True\b([^)]*)\)/.exec(line);
+  const m = /\b(subprocess\.(?:run|call|check_call|check_output|Popen))\(\s*(f?)(["'])(.*?)\3\s*,([^)]*)\bshell\s*=\s*True\b([^)]*)\)/.exec(
+    line,
+  );
   if (!m) return null;
   const exprs: string[] = [];
   const marked = m[2] ? m[4].replace(/\{([^}]+)\}/g, (_x, e: string) => (exprs.push(e.trim()), MARK)) : m[4];
@@ -158,10 +160,16 @@ export const pyShellToList: Fixer = ({ finding, content }) => {
     (t) => 'f"' + t.replace(/\u0001/g, '{').replace(/\u0002/g, '}') + '"',
   );
   if (!tokens) return null;
-  const rest = (m[5] + m[6]).split(',').map((x) => x.trim()).filter(Boolean);
+  const rest = (m[5] + m[6])
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
   const call = `${m[1]}([${tokens.join(', ')}]${rest.length ? ', ' + rest.join(', ') : ''})`;
   lines[idx] = line.slice(0, m.index) + call + line.slice(m.index + m[0].length);
-  return { content: lines.join('\n'), description: 'Run the program directly with an argument list instead of through a shell (shell=True removed).' };
+  return {
+    content: lines.join('\n'),
+    description: 'Run the program directly with an argument list instead of through a shell (shell=True removed).',
+  };
 };
 
 export const evalToJsonParse: Fixer = ({ finding, content }) => {
@@ -175,4 +183,3 @@ export const evalToJsonParse: Fixer = ({ finding, content }) => {
     notes: ['This changes behaviour if the value was an expression: use a dedicated expression parser for that.'],
   };
 };
-

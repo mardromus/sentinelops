@@ -58,7 +58,11 @@ export const dependencyBump: Fixer = ({ finding, content, path }) => {
       return `${m[1]}${m[2]}${m[3] || ''}==${pkg.fixedIn}${m[6]}`;
     });
     if (!changed) return null;
-    return { content: out.join('\n'), description: `Pinned ${pkg.name} to ${pkg.fixedIn}.`, notes: ['Reinstall with "pip install -r" and run the tests.'] };
+    return {
+      content: out.join('\n'),
+      description: `Pinned ${pkg.name} to ${pkg.fixedIn}.`,
+      notes: ['Reinstall with "pip install -r" and run the tests.'],
+    };
   }
   return null;
 };
@@ -96,7 +100,11 @@ export const dockerSecretEnv: Fixer = ({ finding, content }) => {
   const m = idx >= 0 ? /^\s*(ENV|ARG)\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(lines[idx]) : null;
   if (!m) return null;
   lines[idx] = `# ${m[2]} is provided at runtime (docker run -e / orchestrator secret), not baked into the image`;
-  return { content: lines.join('\n'), description: `Removed ${m[2]} from the image; supply it at runtime.`, notes: ['Rotate the old value: it is still present in earlier image layers and git history.'] };
+  return {
+    content: lines.join('\n'),
+    description: `Removed ${m[2]} from the image; supply it at runtime.`,
+    notes: ['Rotate the old value: it is still present in earlier image layers and git history.'],
+  };
 };
 
 export const yamlHarden: Fixer = ({ finding, content }) => {
@@ -151,13 +159,22 @@ export const secretToEnv: Fixer = ({ finding, content, path }): FixOutput | null
   return {
     content: lines.join('\n'),
     description: `Moved the hard-coded credential out of the source: it is now read from ${name}.`,
-    notes: [`Revoke and rotate the exposed value, then set ${name} in the environment or secret manager.`, 'The old value remains in git history.'],
+    notes: [
+      `Revoke and rotate the exposed value, then set ${name} in the environment or secret manager.`,
+      'The old value remains in git history.',
+    ],
   };
 };
 
 // ------------------------------------------------------------ GitHub Actions
 
-const EVENT_PREFIX: Record<string, string> = { pull_request: 'PR', issue: 'ISSUE', comment: 'COMMENT', review: 'REVIEW', head_commit: 'COMMIT' };
+const EVENT_PREFIX: Record<string, string> = {
+  pull_request: 'PR',
+  issue: 'ISSUE',
+  comment: 'COMMENT',
+  review: 'REVIEW',
+  head_commit: 'COMMIT',
+};
 
 /**
  * run: echo "${{ github.event.pull_request.title }}"
@@ -191,5 +208,8 @@ export const ghaEnvIndirection: Fixer = ({ finding, content }) => {
   if (!vars.length) return null;
   const pad = ' '.repeat(keyIndent);
   lines.splice(idx, 1, next, `${pad}env:`, ...vars.map(([n, e]) => `${pad}  ${n}: \${{ ${e} }}`));
-  return { content: lines.join('\n'), description: `Pass ${vars.map(([n]) => n).join(', ')} to the script through env instead of interpolating it into the shell source.` };
+  return {
+    content: lines.join('\n'),
+    description: `Pass ${vars.map(([n]) => n).join(', ')} to the script through env instead of interpolating it into the shell source.`,
+  };
 };

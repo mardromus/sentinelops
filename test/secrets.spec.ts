@@ -18,8 +18,7 @@ const file = (path: string, content: string): SourceFile => ({
   lines: content.split('\n'),
   language: languageOf(path),
 });
-const scan = (path: string, content: string) =>
-  new SecretsScanner().scan({ options: { root: '/x' }, files: [file(path, content)] });
+const scan = (path: string, content: string) => new SecretsScanner().scan({ options: { root: '/x' }, files: [file(path, content)] });
 
 describe('secrets scanner', () => {
   it('detects provider tokens and masks them in the snippet', async () => {
