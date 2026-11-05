@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SentinelOps</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f2ef; --border: rgba(11,11,11,0.10);
+    --text: #0b0b0b; --text-2: #52514e; --muted: #898781; --accent: #2a78d6; --wash: rgba(42,120,214,0.10);
+    --critical: #d03b3b; --high: #ec835a; --medium: #fab219; --low: #5598e7; --info: #898781; --good: #0ca30c; --bad-text: #b42323; --good-text: #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --page: #0d0d0d; --surface: #1a1a19; --surface-2: #222220; --border: rgba(255,255,255,0.10); --text: #f0efec; --text-2: #c3c2b7; --accent: #3987e5; --wash: rgba(57,135,229,0.14); --bad-text: #e66767; --good-text: #0ca30c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 22px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; }
+  .status { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 0; height: calc(100vh - 59px); }
+  aside { border-right: 1px solid var(--border); overflow: auto; padding: 18px; background: var(--surface); }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); margin: 0 0 10px; font-weight: 600; }
+  form { display: grid; gap: 8px; margin-bottom: 22px; }
+  input[type=text], input[type=password] { font: inherit; color: var(--text); background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; width: 100%; }
+  label.chk { display: flex; gap: 8px; align-items: center; color: var(--text-2); font-size: 13px; }
+  button { font: inherit; border: 0; border-radius: 8px; padding: 8px 12px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+  button[disabled] { opacity: .6; cursor: progress; }
+  .err { color: var(--bad-text); font-size: 13px; min-height: 1em; }
+  .scan { display: block; width: 100%; text-align: left; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-weight: 400; }
+  .scan:hover, .scan[aria-current="true"] { background: var(--wash); }
+  .scan .r { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scan .m { color: var(--muted); font-size: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+  .counts { display: inline-flex; gap: 8px; }
+  .counts span { display: inline-flex; gap: 4px; align-items: center; }
+  section.main { display: grid; grid-template-rows: 1fr auto; min-height: 0; }
+  iframe { width: 100%; height: 100%; border: 0; background: var(--page); }
+  .empty { display: grid; place-items: center; color: var(--text-2); height: 100%; text-align: center; padding: 40px; }
+  .audit { border-top: 1px solid var(--border); background: var(--surface); max-height: 32vh; overflow: auto; padding: 12px 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; color: var(--text-2); font-weight: 600; padding: 4px 8px; position: sticky; top: 0; background: var(--surface); }
+  td { padding: 4px 8px; border-top: 1px solid var(--border); vertical-align: top; }
+  td.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .ok { color: var(--good-text); } .no { color: var(--bad-text); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; height: auto; } iframe { height: 80vh; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><svg width="26" height="26" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3 L34 8 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V8 Z" fill="var(--accent)"/><path d="M13.5 20 L18 24.5 L27 15.5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>SentinelOps</div>
+  <div class="status" id="status"></div>
+</header>
+<main>
+  <aside>
+    <h2>New scan</h2>
+    <form id="scanForm">
+      <input type="text" id="path" placeholder="path inside a scan root, e.g. demo/vulnerable-shop" aria-label="Path to scan">
+      <label class="chk"><input type="checkbox" id="ai" checked> AI agent review (LLM if configured, else offline planner)</label>
+      <label class="chk"><input type="checkbox" id="fix" checked> Propose verified fixes</label>
+      <label class="chk"><input type="checkbox" id="osv"> Query OSV.dev online</label>
+      <input type="password" id="token" placeholder="API token (if the server requires one)" aria-label="API token" autocomplete="off">
+      <button type="submit" id="go">Scan</button>
+      <div class="err" id="err" role="alert"></div>
+    </form>
+    <h2>History</h2>
+    <div id="scans"></div>
+  </aside>
+  <section class="main">
+    <div id="viewer"><div class="empty">Run a scan or pick one from the history to see its report.</div></div>
+    <div class="audit"><h2 id="auditTitle">Audit trail</h2><table><thead><tr><th>#</th><th>time</th><th>actor</th><th>action</th><th>target</th><th>decision</th></tr></thead><tbody id="audit"></tbody></table></div>
+  </section>
+</main>
+<script>
+(function () {
+  'use strict';
+  var SEV = ['critical', 'high', 'medium', 'low'];
+  var current = null;
+  function $(id) { return document.getElementById(id); }
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    for (var k in (attrs || {})) {
+      var v = attrs[k]; if (v == null || v === false) continue;
+      if (k === 'text') el.textContent = v; else if (k === 'class') el.className = v; else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v); else el.setAttribute(k, v);
+    }
+    for (var i = 2; i < arguments.length; i++) { var c = arguments[i]; if (c == null) continue; (Array.isArray(c) ? c : [c]).forEach(function (x) { el.appendChild(typeof x === 'object' ? x : document.createTextNode(String(x))); }); }
+    return el;
+  }
+  function token() { try { return sessionStorage.getItem('so-token') || ''; } catch (e) { return ''; } }
+  function api(path, opts) {
+    opts = opts || {}; opts.headers = opts.headers || {};
+    var t = $('token').value || token();
+    if (t) opts.headers.authorization = 'Bearer ' + t;
+    return fetch(path, opts).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || r.statusText); return j; }); });
+  }
+  function pill(text, color) { return h('span', { class: 'pill' }, color ? h('span', { class: 'dot', style: 'background:' + color }) : null, text); }
+
+  function loadHealth() {
+    api('/api/health').then(function (s) {
+      var el = $('status'); el.textContent = '';
+      el.appendChild(pill('autonomy ' + s.autonomy, 'var(--accent)'));
+      el.appendChild(pill(s.llm.configured ? 'LLM ' + s.llm.model : 'offline agent', s.llm.configured ? 'var(--good)' : 'var(--muted)'));
+      el.appendChild(pill('GitHub ' + (s.github.token ? 'connected' : 'not connected'), s.github.token ? 'var(--good)' : 'var(--muted)'));
+      el.appendChild(pill('v' + s.version));
+    }).catch(function () {});
+  }
+
+  function loadScans() {
+    return api('/api/scans').then(function (list) {
+      var el = $('scans'); el.textContent = '';
+      if (!list.length) el.appendChild(h('div', { class: 'pill', text: 'No scans yet' }));
+      list.forEach(function (s) {
+        var name = s.source && s.source.repo ? s.source.repo + (s.source.pr ? ' #' + s.source.pr : '') : s.root.split(/[\\/]/).filter(Boolean).pop();
+        var counts = h('span', { class: 'counts' }, SEV.map(function (k) { return h('span', { title: k }, h('span', { class: 'dot', style: 'background:var(--' + k + ')' }), String(s.summary.bySeverity[k] || 0)); }));
+        el.appendChild(h('button', { class: 'scan', type: 'button', 'aria-current': current === s.id ? 'true' : 'false', onclick: function () { show(s.id); } },
+          h('div', { class: 'r', text: name }),
+          h('div', { class: 'm' }, h('span', null, h('span', { class: 'dot', style: 'background:' + (s.gate.pass ? 'var(--good)' : 'var(--critical)') }), s.gate.pass ? ' passed' : ' failed'), counts, h('span', { text: new Date(s.createdAt).toLocaleString() }))));
+      });
+      return list;
+    });
+  }
+
+  function show(id) {
+    current = id;
+    var v = $('viewer'); v.textContent = '';
+    v.appendChild(h('iframe', { src: '/api/scans/' + encodeURIComponent(id) + '/report.html', title: 'Scan report', sandbox: 'allow-scripts allow-downloads allow-popups allow-popups-to-escape-sandbox' }));
+    loadScans();
+  }
+
+  function loadAudit() {
+    api('/api/audit?limit=60').then(function (a) {
+      $('auditTitle').textContent = 'Audit trail · ' + a.count + ' entries · chain ' + (a.valid ? 'intact ✓' : 'BROKEN at #' + a.brokenAt);
+      var tb = $('audit'); tb.textContent = '';
+      a.entries.forEach(function (e) {
+        tb.appendChild(h('tr', null, h('td', { class: 'mono', text: e.seq }), h('td', { text: new Date(e.ts).toLocaleTimeString() }), h('td', { text: e.actor }), h('td', { class: 'mono', text: e.action }),
+          h('td', { class: 'mono', text: e.target || '' }), h('td', { class: e.allowed === false ? 'no' : e.allowed ? 'ok' : '', text: (e.allowed === false ? 'denied: ' : e.allowed ? 'allowed: ' : '') + (e.reason || '') })));
+      });
+    }).catch(function () {});
+  }
+
+  $('scanForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var t = $('token').value; if (t) { try { sessionStorage.setItem('so-token', t); } catch (e) {} }
+    $('go').disabled = true; $('go').textContent = 'Scanning…'; $('err').textContent = '';
+    api('/api/scans', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: $('path').value || undefined, ai: $('ai').checked, fix: $('fix').checked, osv: $('osv').checked }) })
+      .then(function (r) { show(r.id); loadAudit(); })
+      .catch(function (e) { $('err').textContent = e.message; })
+      .finally(function () { $('go').disabled = false; $('go').textContent = 'Scan'; });
+  });
+
+  loadHealth();
+  loadScans().then(function (l) { if (l.length) show(l[0].id); });
+  loadAudit();
+  setInterval(loadAudit, 15000);
+})();
+</script>
+</body>
+</html>
