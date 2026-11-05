@@ -62,6 +62,18 @@ export interface Finding {
   triageNotes?: string[];
   // filled by remediation
   fix?: FixProposal;
+  // filled by the agent
+  verdict?: Verdict;
+}
+
+export type VerdictStatus = 'true_positive' | 'likely_false_positive' | 'needs_review';
+
+export interface Verdict {
+  status: VerdictStatus;
+  confidence: Confidence;
+  rationale: string;
+  by: 'llm' | 'offline' | 'human';
+  guardrail?: string; // set when a guardrail changed what the model asked for
 }
 
 export interface FixProposal {
