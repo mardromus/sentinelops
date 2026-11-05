@@ -14,6 +14,9 @@ export interface AppConfig {
   external: boolean;
   llm: { baseUrl: string; apiKey: string; model: string; maxSteps: number };
   github: { token: string; webhookSecret: string; apiUrl: string };
+  apiToken: string; // bearer token required for mutating API calls when set
+  scanRoots: string[]; // directories the HTTP API is allowed to scan
+  publicUrl: string; // base URL used in links (commit statuses, PR comments)
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
@@ -45,7 +48,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     github: {
       token: env.GITHUB_TOKEN || '',
       webhookSecret: env.GITHUB_WEBHOOK_SECRET || '',
-      apiUrl: env.GITHUB_API_URL || 'https://api.github.com',
+      apiUrl: (env.GITHUB_API_URL || 'https://api.github.com').replace(/\/$/, ''),
     },
+    apiToken: env.SENTINELOPS_API_TOKEN || '',
+    scanRoots: (env.SENTINELOPS_SCAN_ROOTS || process.cwd())
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    publicUrl: (env.SENTINELOPS_PUBLIC_URL || `http://localhost:${int(env.PORT, 3000)}`).replace(/\/$/, ''),
   };
 }
