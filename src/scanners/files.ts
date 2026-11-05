@@ -5,7 +5,7 @@ import { SourceFile } from '../common/types';
 
 const SKIP_DIRS = new Set([
   'node_modules', '.git', 'dist', 'build', 'coverage', 'vendor', '.venv', 'venv', '__pycache__',
-  '.next', '.nuxt', 'out', '.cache', '.terraform', 'target',
+  '.next', '.nuxt', 'out', '.cache', '.terraform', 'target', '.sentinelops',
 ]);
 
 export const DEFAULT_MAX_BYTES = 1_000_000;

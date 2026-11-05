@@ -45,9 +45,10 @@ export const RULES: Rule[] = [
     cwe: ['CWE-89'],
     languages: JS,
     patterns: [
-      /\.(query|execute|exec|raw|all|get|run)\s*\(\s*(['"])[^'"]*\b(select|insert|update|delete)\b[^'"]*\2\s*\+/i,
-      /\.(query|execute|exec|raw|all|get|run)\s*\(\s*`[^`]*\b(select|insert|update|delete)\b[^`]*\$\{/i,
+      /\.(query|execute|exec|raw|all|get|run)\s*\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*\+/,
+      /\.(query|execute|exec|raw|all|get|run)\s*\(\s*`[^`]*\$\{/,
     ],
+    lineRequires: /\b(select|insert|update|delete)\b[\s\S]*\b(from|into|set|where)\b/i,
     message: 'The SQL text is concatenated with values, so input can change the query (SQL injection).',
     remediation: 'Pass values as parameters: db.query("SELECT ... WHERE id = ?", [id]).',
     fixer: 'sql-parameterize',
@@ -256,6 +257,7 @@ export const RULES: Rule[] = [
     patterns: [/res\.(status\(\d+\)\.)?(send|json)\s*\(\s*(err|error|e)(\.stack|\.message)?\s*\)/],
     message: 'Stack traces and internal messages help attackers map the system.',
     remediation: 'Log the error server-side and return a generic message with a request id.',
+    fixer: 'generic-error',
   },
   // ---- A08 Integrity -------------------------------------------------------------
   {
@@ -268,6 +270,7 @@ export const RULES: Rule[] = [
     patterns: [/(_|lodash|merge|deepmerge|extend)\.?(merge|defaultsDeep|extend)?\s*\(\s*[\w.{}[\]]+\s*,\s*req(uest)?\.(body|query)/],
     message: 'Merging client objects deeply lets "__proto__" keys pollute every object in the process.',
     remediation: 'Copy only expected fields, or merge into Object.create(null) after rejecting __proto__/constructor.',
+    fixer: 'strip-proto-keys',
   },
   // ---- A09 Logging ---------------------------------------------------------------
   {
@@ -289,10 +292,8 @@ export const RULES: Rule[] = [
     confidence: 'high',
     cwe: ['CWE-89'],
     languages: PY,
-    patterns: [
-      /\.execute\(\s*f["'][^"']*\b(select|insert|update|delete)\b/i,
-      /\.execute\(\s*["'][^"']*\b(select|insert|update|delete)\b[^"']*["']\s*(%|\+|\.format\()/i,
-    ],
+    patterns: [/\.execute\(\s*f("|')/, /\.execute\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*(%|\+|\.format\()/],
+    lineRequires: /\b(select|insert|update|delete)\b/i,
     message: 'The SQL text is built with string formatting, so input can change the query.',
     remediation: 'cursor.execute("SELECT ... WHERE id = %s", (id,))',
     fixer: 'py-sql-parameterize',
@@ -308,6 +309,7 @@ export const RULES: Rule[] = [
     patterns: [/subprocess\.\w+\([^)]*shell\s*=\s*True/, /\bos\.(system|popen)\s*\(\s*(f["']|[^"')]+\+|["'][^"']*["']\s*%)/],
     message: 'The command runs through a shell with interpolated values.',
     remediation: 'subprocess.run([...args], shell=False) with an argument list.',
+    fixer: 'py-shell-to-list',
     escalateOnTaint: true,
   },
   {

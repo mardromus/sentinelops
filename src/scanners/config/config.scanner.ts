@@ -145,13 +145,23 @@ export const containerYamlChecks: Check = (file) => {
 };
 
 // ------------------------------------------------------------ GitHub Actions
+/** Event fields an outside contributor controls (titles, bodies, branch names, commit messages). */
+export const UNTRUSTED_EXPR =
+  /\$\{\{\s*(github\.event\.(issue|pull_request|comment|review|review_comment|head_commit|discussion|commits)[\w.[\]*]*\.(title|body|message|name|label|ref|email|default_branch)\b[\w.]*|github\.head_ref)\s*\}\}/;
+
 export const workflowChecks: Check = (file) => {
   if (!isWorkflow(file.path)) return [];
   const hits: ConfigHit[] = [];
   const prTarget = /^\s*pull_request_target\s*:?/m.test(file.content) || /on\s*:\s*\[?[^\]\n]*pull_request_target/.test(file.content);
+  let runBlock: number | null = null; // indentation of a `run: |` key while inside its script
   file.lines.forEach((raw, i) => {
     const line = raw.replace(/\s#.*$/, '');
     const n = i + 1;
+    const indent = /^(\s*)/.exec(raw)![1].length;
+    if (runBlock !== null && raw.trim() && indent <= runBlock) runBlock = null;
+    const runKey = /^(\s*)(-\s*)?run\s*:/.exec(raw);
+    const inScript = runBlock !== null || !!runKey;
+    if (runKey && /run\s*:\s*[|>][-+]?\s*$/.test(raw)) runBlock = runKey[1].length + (runKey[2]?.length || 0);
     const uses = /^\s*-?\s*uses\s*:\s*["']?([^@\s"']+)@([^\s"']+)/.exec(line);
     if (uses && !uses[1].startsWith('./') && !/^(actions|github)\//.test(uses[1]) && !/^[0-9a-f]{40}$/.test(uses[2])) {
       hits.push({
@@ -177,7 +187,7 @@ export const workflowChecks: Check = (file) => {
         remediation: 'Use the pull_request trigger for untrusted code, or split into a privileged workflow_run that never runs PR code.',
       });
     }
-    if (/\$\{\{\s*github\.event\.(issue|pull_request|comment|review|head_commit)\.[\w.]*(title|body|message|name|label)[\w.]*\s*\}\}/.test(line) && /^\s*(-\s*)?run\s*:|^\s{6,}\S/.test(raw)) {
+    if (inScript && UNTRUSTED_EXPR.test(line)) {
       hits.push({
         ruleId: 'config.gha.script-injection',
         title: 'Untrusted event data interpolated into a shell script',
