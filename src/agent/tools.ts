@@ -132,7 +132,11 @@ function findingOrThrow(s: AgentSession, id: unknown): Finding {
 
 function noteInjection(s: AgentSession, source: string, text: string): void {
   const r = detectInjection(text);
-  if (r.flagged && !s.injections.some((i) => i.source === source)) s.injections.push({ source, labels: r.labels, excerpt: r.excerpt });
+  if (!r.flagged) return;
+  const file = source.replace(/:\d+-\d+$/, '');
+  const seen = s.injections.find((i) => i.source.replace(/:\d+-\d+$/, '') === file);
+  if (seen) seen.labels = [...new Set([...seen.labels, ...r.labels])];
+  else s.injections.push({ source, labels: r.labels, excerpt: r.excerpt });
 }
 
 const TAINTED = /straight from the HTTP request/;

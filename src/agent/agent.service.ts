@@ -243,7 +243,8 @@ export function offlineSummary(result: ScanResult, s: AgentSession): string {
   const sev = ['critical', 'high', 'medium', 'low', 'info'].map((k) => [k, active.filter((f) => f.severity === k).length] as const).filter(([, n]) => n);
   const owasp = [...new Set(active.flatMap((f) => f.owasp))].sort();
   const p1 = active.filter((f) => f.priority === 'P1');
-  const verified = [...s.fixes.values()].filter((p) => p.verified);
+  const verifiedIds = new Set([...[...s.fixes.values()].filter((p) => p.verified).map((p) => p.findingId), ...active.filter((f) => f.fix?.verified).map((f) => f.id)]);
+  const verified = [...verifiedIds].map((findingId) => ({ findingId }));
   const lines = [
     `${active.length} active findings in ${result.filesScanned} files (${sev.map(([k, n]) => `${n} ${k}`).join(', ')}), across OWASP ${owasp.join(', ')}.`,
   ];
