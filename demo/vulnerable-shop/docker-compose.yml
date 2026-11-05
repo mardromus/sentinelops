@@ -1,0 +1,11 @@
+services:
+  shop:
+    build: .
+    ports:
+      - "3000:3000"
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  worker:
+    build: ./worker
+    network_mode: host

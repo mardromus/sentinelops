@@ -1,0 +1,15 @@
+name: preview
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: echo "Building preview for ${{ github.event.pull_request.title }}"
+      - uses: some-vendor/deploy-preview@v2
+        with:
+          token: ${{ secrets.DEPLOY_TOKEN }}
