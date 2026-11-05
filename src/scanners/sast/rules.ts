@@ -86,7 +86,10 @@ export const RULES: Rule[] = [
     confidence: 'medium',
     cwe: ['CWE-79'],
     languages: JS,
-    patterns: [/res\.(send|write|end)\s*\([^;]*(`[^`]*\$\{[^}]*req(uest)?\.(query|body|params)|req(uest)?\.(query|body|params))/],
+    patterns: [
+      /res\.(send|write|end)\s*\(\s*(`[^`]*\$\{[^}]*req(uest)?\.(query|body|params)|req(uest)?\.(query|body|params))/,
+      /res\.(send|write|end)\s*\(\s*(['"])[^'"]*<[^'"]*\2\s*\+\s*req(uest)?\.(query|body|params)/,
+    ],
     unless: /res\.send\(\s*\{|escape(Html)?\(|sanitize|DOMPurify/,
     message: 'User input is reflected in the response without encoding (cross-site scripting).',
     remediation: 'HTML-encode the value or render it through a template engine that escapes by default.',
@@ -123,7 +126,7 @@ export const RULES: Rule[] = [
     cwe: ['CWE-22'],
     languages: JS,
     patterns: [/\b(readFile|readFileSync|createReadStream|sendFile|download|unlink|writeFile)\w*\s*\([^;]*req(uest)?\.(query|params|body)/],
-    unless: /path\.basename\(|safeJoin|resolveInside/,
+    unless: /\bbasename\(|safeJoin|resolveInside/,
     message: 'A filesystem path is built from input, so "../" sequences can reach any file.',
     remediation: 'Resolve against a base directory and reject paths that escape it.',
     fixer: 'path-basename',
@@ -201,6 +204,7 @@ export const RULES: Rule[] = [
     patterns: [/rejectUnauthorized\s*:\s*false/, /NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]?0/],
     message: 'Disabling certificate checks allows man-in-the-middle attacks.',
     remediation: 'Remove the override; trust a custom CA via the ca option if needed.',
+    fixer: 'tls-verify',
   },
   // ---- A07 Auth -----------------------------------------------------------------
   {
@@ -291,6 +295,7 @@ export const RULES: Rule[] = [
     ],
     message: 'The SQL text is built with string formatting, so input can change the query.',
     remediation: 'cursor.execute("SELECT ... WHERE id = %s", (id,))',
+    fixer: 'py-sql-parameterize',
     escalateOnTaint: true,
   },
   {
@@ -326,6 +331,7 @@ export const RULES: Rule[] = [
     patterns: [/\bpickle\.loads?\s*\(/, /\byaml\.load\s*\((?![^)]*SafeLoader)/],
     message: 'Deserialising untrusted data can execute code.',
     remediation: 'Use json, or yaml.safe_load.',
+    fixer: 'yaml-safe-load',
   },
   {
     id: 'py.crypto.weak-hash',
@@ -337,6 +343,7 @@ export const RULES: Rule[] = [
     patterns: [/hashlib\.(md5|sha1)\s*\(/],
     message: 'MD5 and SHA-1 are broken for security purposes.',
     remediation: 'hashlib.sha256 for integrity; bcrypt/argon2 for passwords.',
+    fixer: 'weak-hash',
   },
   {
     id: 'py.tls.verify-disabled',
@@ -348,6 +355,7 @@ export const RULES: Rule[] = [
     patterns: [/verify\s*=\s*False/],
     message: 'Certificate checks are disabled for this request.',
     remediation: 'Remove verify=False; pass a CA bundle if needed.',
+    fixer: 'tls-verify',
   },
   {
     id: 'py.flask.debug',
@@ -359,5 +367,6 @@ export const RULES: Rule[] = [
     patterns: [/\.run\([^)]*debug\s*=\s*True/],
     message: 'The Werkzeug debugger allows remote code execution if exposed.',
     remediation: 'Never enable debug in production; read it from configuration.',
+    fixer: 'flask-debug',
   },
 ];
