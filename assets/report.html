@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;">
+<title>SentinelOps report</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface-1: #fcfcfb; --surface-2: #f3f2ef; --border: rgba(11,11,11,0.10);
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7; --accent: #2a78d6; --accent-wash: rgba(42,120,214,0.10);
+    --sev-critical: #d03b3b; --sev-high: #ec835a; --sev-medium: #fab219; --sev-low: #5598e7; --sev-info: #898781;
+    --good: #0ca30c; --good-text: #006300; --bad-text: #b42323;
+    --add-bg: rgba(12,163,12,0.12); --del-bg: rgba(208,59,59,0.12);
+    --cell-empty: #f0efec; --bar: #2a78d6;
+    --code-bg: #f3f2ef;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface-1: #1a1a19; --surface-2: #222220; --border: rgba(255,255,255,0.10);
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835; --accent: #3987e5; --accent-wash: rgba(57,135,229,0.14);
+      --good-text: #0ca30c; --bad-text: #e66767; --cell-empty: #262624; --bar: #3987e5; --code-bg: #121211;
+      --add-bg: rgba(12,163,12,0.18); --del-bg: rgba(208,59,59,0.20);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface-1: #1a1a19; --surface-2: #222220; --border: rgba(255,255,255,0.10);
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --accent: #3987e5; --accent-wash: rgba(57,135,229,0.14);
+    --good-text: #0ca30c; --bad-text: #e66767; --cell-empty: #262624; --bar: #3987e5; --code-bg: #121211;
+    --add-bg: rgba(12,163,12,0.18); --del-bg: rgba(208,59,59,0.20);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body.viz-root { background: var(--page); color: var(--text-primary); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 24px 64px; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+  header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+  .brand { display: flex; gap: 14px; align-items: center; }
+  .brand svg { flex: none; }
+  .brand h1 { font-size: 22px; line-height: 1.2; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  .meta { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  button, select, input[type=search] { font: inherit; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+  button { cursor: pointer; } button:hover { background: var(--surface-2); }
+  .badge { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 6px 12px; font-weight: 600; border: 1px solid var(--border); background: var(--surface-1); }
+  .badge .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .grid { display: grid; gap: 16px; }
+  .g-hero { grid-template-columns: minmax(260px, 1.1fr) 2.9fr; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary); margin: 0 0 14px; font-weight: 600; }
+  .card h2 .sub { text-transform: none; letter-spacing: 0; color: var(--text-muted); font-weight: 400; margin-left: 6px; }
+  .hero { display: flex; flex-direction: column; justify-content: space-between; }
+  .hero .label { color: var(--text-secondary); font-size: 13px; }
+  .hero .value { font-size: 64px; font-weight: 650; line-height: 1; letter-spacing: -0.02em; margin: 10px 0 6px; }
+  .hero .value small { font-size: 20px; color: var(--text-muted); font-weight: 500; }
+  .meter { height: 8px; border-radius: 999px; background: var(--cell-empty); overflow: hidden; margin: 10px 0 8px; }
+  .meter > span { display: block; height: 100%; border-radius: 999px; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tile { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; }
+  .tile .label { color: var(--text-secondary); font-size: 12.5px; }
+  .tile .value { font-size: 26px; font-weight: 650; line-height: 1.2; margin-top: 2px; }
+  .sev-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 12px; }
+  .sev { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+  .sev .ico { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; flex: none; }
+  .sev .ico.medium { color: #0b0b0b; }
+  .sev .n { font-size: 20px; font-weight: 650; line-height: 1; }
+  .sev .t { color: var(--text-secondary); font-size: 12px; text-transform: capitalize; }
+  .g-two { grid-template-columns: 1.35fr 1fr; margin-top: 16px; }
+  .heat { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; border-radius: 10px; overflow: hidden; }
+  .cell { min-height: 92px; padding: 10px 11px; display: flex; flex-direction: column; justify-content: space-between; cursor: default; outline: none; transition: filter .12s; }
+  .cell:hover, .cell:focus-visible { filter: brightness(1.08); box-shadow: inset 0 0 0 2px var(--accent); }
+  .cell .cid { font-size: 11.5px; font-weight: 600; opacity: .85; }
+  .cell .cname { font-size: 12px; line-height: 1.25; }
+  .cell .ccount { font-size: 22px; font-weight: 650; }
+  .legend { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--text-muted); font-size: 12px; }
+  .legend .ramp { display: flex; gap: 2px; } .legend .ramp span { width: 18px; height: 8px; border-radius: 2px; }
+  .bars { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: minmax(120px, 42%) 1fr; gap: 12px; align-items: center; outline: none; }
+  .bar-row .name { color: var(--text-secondary); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+  .bar-track { display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--baseline); min-height: 22px; }
+  .bar-track .bar { height: 12px; border-radius: 0 4px 4px 0; background: var(--bar); min-width: 2px; }
+  .bar-row:hover .bar, .bar-row:focus-visible .bar { filter: brightness(1.15); }
+  .bar-track .v { font-size: 12.5px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .brief { margin-top: 16px; }
+  .brief p { margin: 0; white-space: pre-wrap; font-size: 14.5px; line-height: 1.6; }
+  .brief .who { color: var(--text-muted); font-size: 12.5px; margin-top: 10px; }
+  .warn { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--del-bg); font-size: 13px; }
+  .filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 28px 0 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 11px; text-transform: capitalize; }
+  .chip[aria-pressed="false"] { opacity: .45; }
+  .chip .dot, .sevlabel .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .filters .spacer { flex: 1; }
+  .count { color: var(--text-muted); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; }
+  .tbl { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  th { text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 10px 12px; border-bottom: 1px solid var(--grid); background: var(--surface-1); position: sticky; top: 0; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  tr.row { cursor: pointer; outline: none; }
+  tr.row:hover td, tr.row:focus-visible td { background: var(--accent-wash); }
+  tr.row.sup td { opacity: .55; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  .sevlabel { display: inline-flex; align-items: center; gap: 6px; text-transform: capitalize; white-space: nowrap; }
+  .loc { color: var(--text-secondary); word-break: break-all; }
+  .pill { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-secondary); white-space: nowrap; }
+  .pill.ok { color: var(--good-text); } .pill.bad { color: var(--bad-text); }
+  tr.detail td { background: var(--surface-2); padding: 16px 18px 20px; }
+  .det { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .det h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin: 0 0 6px; font-weight: 600; }
+  .det p { margin: 0 0 10px; }
+  .det .full { grid-column: 1 / -1; }
+  pre { margin: 0; background: var(--code-bg); border-radius: 8px; padding: 10px 12px; overflow: auto; border: 1px solid var(--border); }
+  pre .add { background: var(--add-bg); display: block; } pre .del { background: var(--del-bg); display: block; } pre .hunk { color: var(--text-muted); display: block; }
+  .notes { margin: 0; padding-left: 18px; color: var(--text-secondary); }
+  .scanners td, .scanners th { font-size: 13px; }
+  footer { margin-top: 36px; color: var(--text-muted); font-size: 12px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .tip { position: fixed; z-index: 10; pointer-events: none; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; font-size: 12.5px; box-shadow: 0 6px 24px rgba(0,0,0,.18); max-width: 320px; display: none; }
+  .tip .tv { font-weight: 650; font-size: 15px; }
+  .tip .tk { color: var(--text-secondary); }
+  .tip .tr { display: flex; align-items: center; gap: 6px; }
+  .tip .key { width: 12px; height: 2px; border-radius: 2px; display: inline-block; }
+  .empty { padding: 28px; text-align: center; color: var(--text-secondary); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media (max-width: 900px) { .g-hero, .g-two, .det { grid-template-columns: 1fr; } .tiles { grid-template-columns: repeat(2, 1fr); } .sev-row { grid-template-columns: repeat(3, 1fr); } .heat { grid-template-columns: repeat(2, 1fr); } }
+  @media print { .actions, .filters { display: none; } .card, .tbl { break-inside: avoid; } body.viz-root { background: #fff; } }
+</style>
+</head>
+<body class="viz-root">
+<div class="wrap" id="app"></div>
+<div class="tip" id="tip" role="tooltip"></div>
+<script type="application/json" id="so-data">"__SENTINELOPS_DATA__"</script>
+<script>
+(function () {
+  'use strict';
+  var D = JSON.parse(document.getElementById('so-data').textContent);
+  var SEV = ['critical', 'high', 'medium', 'low', 'info'];
+  var SEV_ICON = { critical: '!!', high: '!', medium: '~', low: 'i', info: '·' };
+  var RAMP = {
+    light: ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95'],
+    dark: ['#0d366b', '#104281', '#1c5cab', '#256abf', '#3987e5', '#6da7ec']
+  };
+  var DARK_INK_ON = { '#cde2fb': 1, '#9ec5f4': 1, '#6da7ec': 1 };
+  var state = { sev: { critical: true, high: true, medium: true, low: true, info: true }, cat: '', q: '', fixOnly: false, showSuppressed: false, open: {} };
+
+  function theme() {
+    var t = document.documentElement.getAttribute('data-theme');
+    if (t) return t;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    if (attrs) for (var k in attrs) {
+      var v = attrs[k];
+      if (v === undefined || v === null || v === false) continue;
+      if (k === 'text') el.textContent = v;
+      else if (k === 'class') el.className = v;
+      else if (k === 'style') el.setAttribute('style', v);
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (var i = 2; i < arguments.length; i++) add(el, arguments[i]);
+    return el;
+  }
+  function add(el, c) {
+    if (c === undefined || c === null || c === false) return;
+    if (Array.isArray(c)) { c.forEach(function (x) { add(el, x); }); return; }
+    el.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c);
+  }
+  function fmtDate(s) { try { return new Date(s).toLocaleString(); } catch (e) { return s; } }
+  function active() { return D.findings.filter(function (f) { return !f.suppressed; }); }
+  function sevVar(s) { return 'var(--sev-' + s + ')'; }
+  function sevLabel(s) { return h('span', { class: 'sevlabel' }, h('span', { class: 'dot', style: 'background:' + sevVar(s) }), s); }
+
+  // ---------- tooltip (enhances; every value is also in the table) ----------
+  var tip = document.getElementById('tip');
+  function showTip(ev, value, rows) {
+    tip.textContent = '';
+    add(tip, h('div', { class: 'tv', text: value }));
+    (rows || []).forEach(function (r) { add(tip, h('div', { class: 'tr' }, r.color ? h('span', { class: 'key', style: 'background:' + r.color }) : null, h('span', { class: 'tk', text: r.text }))); });
+    tip.style.display = 'block';
+    var x = ev.clientX, y = ev.clientY;
+    if (x === undefined || (x === 0 && y === 0)) { var r = ev.target.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top; }
+    var w = tip.offsetWidth, hh = tip.offsetHeight;
+    tip.style.left = Math.min(window.innerWidth - w - 8, Math.max(8, x + 14)) + 'px';
+    tip.style.top = Math.max(8, y - hh - 12) + 'px';
+  }
+  function hideTip() { tip.style.display = 'none'; }
+  function hover(el, fn) {
+    el.addEventListener('pointermove', function (e) { fn(e); });
+    el.addEventListener('pointerleave', hideTip);
+    el.addEventListener('focus', function (e) { fn(e); });
+    el.addEventListener('blur', hideTip);
+  }
+
+  // ---------- sections ----------
+  function header() {
+    var g = D.gate;
+    var shield = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    shield.setAttribute('width', '40'); shield.setAttribute('height', '40'); shield.setAttribute('viewBox', '0 0 40 40'); shield.setAttribute('aria-hidden', 'true');
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', 'M20 3 L34 8 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V8 Z'); p.setAttribute('fill', 'var(--accent)');
+    var c = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    c.setAttribute('d', 'M13.5 20 L18 24.5 L27 15.5'); c.setAttribute('stroke', '#fff'); c.setAttribute('stroke-width', '3'); c.setAttribute('fill', 'none'); c.setAttribute('stroke-linecap', 'round'); c.setAttribute('stroke-linejoin', 'round');
+    shield.appendChild(p); shield.appendChild(c);
+    return h('header', { class: 'top' },
+      h('div', { class: 'brand' }, shield, h('div', null,
+        h('h1', { text: D.title }),
+        h('div', { class: 'meta', text: D.scan.root + ' · ' + D.scan.filesScanned + ' files · ' + fmtDate(D.scan.finishedAt) + ' · scan ' + D.scan.id.slice(0, 8) }))),
+      h('div', { class: 'actions' },
+        g ? h('span', { class: 'badge', title: 'CI gate: fail on ' + g.failOn + ' or worse' }, h('span', { class: 'dot', style: 'background:' + (g.pass ? 'var(--good)' : 'var(--sev-critical)') }), g.pass ? 'Gate passed' : 'Gate failed', h('span', { class: 'pill', text: '≥ ' + g.failOn })) : null,
+        h('button', { onclick: download, title: 'Download the raw findings as JSON', text: 'JSON' }),
+        h('button', { onclick: toggleTheme, 'aria-label': 'Toggle light or dark theme', text: theme() === 'dark' ? '☀ Light' : '☾ Dark' })));
+  }
+
+  function riskScore() {
+    if (D.summary && typeof D.summary.riskScore === 'number') return D.summary.riskScore;
+    var a = active(); if (!a.length) return 0;
+    var max = Math.max.apply(null, a.map(function (f) { return f.risk || 0; }));
+    var sum = a.reduce(function (s, f) { return s + (f.risk || 0); }, 0);
+    return Math.min(100, Math.round(max * 0.6 + Math.min(40, sum / 25)));
+  }
+
+  function overview() {
+    var a = active();
+    var score = riskScore();
+    var meterColor = score >= 80 ? 'var(--sev-critical)' : score >= 60 ? 'var(--sev-high)' : score >= 35 ? 'var(--sev-medium)' : 'var(--good)';
+    var band = score >= 80 ? 'Critical exposure' : score >= 60 ? 'High exposure' : score >= 35 ? 'Moderate exposure' : 'Low exposure';
+    var fixes = a.filter(function (f) { return f.fix && f.fix.verified; }).length;
+    var p1 = a.filter(function (f) { return f.priority === 'P1'; }).length;
+    var tiles = [
+      ['Active findings', a.length], ['Fix first (P1)', p1], ['Verified fixes ready', fixes], ['Suppressed', D.findings.length - a.length]
+    ];
+    var counts = {}; SEV.forEach(function (s) { counts[s] = a.filter(function (f) { return f.severity === s; }).length; });
+    return h('section', { class: 'grid g-hero' },
+      h('div', { class: 'card hero' },
+        h('div', null, h('div', { class: 'label', text: 'Risk score' }),
+          h('div', { class: 'value' }, String(score), h('small', { text: ' / 100' })),
+          h('div', { class: 'meter', role: 'img', 'aria-label': 'Risk score ' + score + ' of 100: ' + band }, h('span', { style: 'width:' + score + '%;background:' + meterColor }))),
+        h('div', { class: 'label', text: band + ' · worst finding risk and volume combined' })),
+      h('div', { class: 'card' },
+        h('div', { class: 'tiles' }, tiles.map(function (t) { return h('div', { class: 'tile' }, h('div', { class: 'label', text: t[0] }), h('div', { class: 'value', text: t[1].toLocaleString() })); })),
+        h('div', { class: 'sev-row' }, SEV.map(function (s) {
+          return h('div', { class: 'sev', title: counts[s] + ' ' + s },
+            h('span', { class: 'ico ' + s, style: 'background:' + sevVar(s), 'aria-hidden': 'true', text: SEV_ICON[s] }),
+            h('div', null, h('div', { class: 'n', text: counts[s] }), h('div', { class: 't', text: s })));
+        }))));
+  }
+
+  function heatmap() {
+    var ramp = RAMP[theme()];
+    var max = Math.max.apply(null, D.heatmap.map(function (c) { return c.count; }).concat([1]));
+    var cells = D.heatmap.map(function (c) {
+      var fill = 'var(--cell-empty)', ink = 'var(--text-muted)';
+      if (c.count > 0) {
+        var idx = Math.min(ramp.length - 1, Math.round((c.count / max) * (ramp.length - 1)));
+        fill = ramp[idx]; ink = DARK_INK_ON[fill] ? '#0b0b0b' : '#ffffff';
+      }
+      var meta = D.owasp.filter(function (o) { return o.id === c.id; })[0];
+      var rules = {};
+      active().forEach(function (f) { if (f.owasp.indexOf(c.id) >= 0) rules[f.ruleId] = (rules[f.ruleId] || 0) + 1; });
+      var top = Object.keys(rules).sort(function (a, b) { return rules[b] - rules[a]; }).slice(0, 4);
+      var el = h('a', { class: 'cell', href: meta ? meta.url : undefined, target: '_blank', rel: 'noopener noreferrer', tabindex: '0', style: 'background:' + fill + ';color:' + ink,
+        'aria-label': c.id + ' ' + c.name + ': ' + c.count + ' findings' + (c.worst ? ', worst ' + c.worst : '') },
+        h('div', null, h('div', { class: 'cid', text: c.id.replace(':2021', '') }), h('div', { class: 'cname', text: c.name })),
+        h('div', { class: 'ccount', text: c.count }));
+      hover(el, function (e) {
+        showTip(e, c.count + (c.count === 1 ? ' finding' : ' findings'), [{ text: c.id + ' ' + c.name }].concat(c.worst ? [{ color: sevVar(c.worst), text: 'worst: ' + c.worst }] : []).concat(top.map(function (r) { return { text: rules[r] + ' × ' + r }; })));
+      });
+      return el;
+    });
+    var legend = h('div', { class: 'legend' }, h('span', { text: 'fewer' }), h('span', { class: 'ramp' }, ramp.map(function (c) { return h('span', { style: 'background:' + c }); })), h('span', { text: 'more findings' }));
+    return h('div', { class: 'card' }, h('h2', null, 'OWASP Top 10 (2021)', h('span', { class: 'sub', text: 'active findings per category · click a cell for OWASP guidance' })), h('div', { class: 'heat', role: 'list' }, cells), legend);
+  }
+
+  function filesChart() {
+    var by = {};
+    active().forEach(function (f) { var k = f.location.file; by[k] = by[k] || { n: 0, sev: {} }; by[k].n++; by[k].sev[f.severity] = (by[k].sev[f.severity] || 0) + 1; });
+    var files = Object.keys(by).sort(function (a, b) { return by[b].n - by[a].n || a.localeCompare(b); }).slice(0, 9);
+    var max = files.length ? by[files[0]].n : 1;
+    var body = files.length ? h('div', { class: 'bars' }, files.map(function (k) {
+      var row = h('div', { class: 'bar-row', tabindex: '0', 'aria-label': k + ': ' + by[k].n + ' findings' },
+        h('div', { class: 'name', title: k }, h('bdi', { text: k })),
+        h('div', { class: 'bar-track' }, h('div', { class: 'bar', style: 'width:' + Math.max(2, (by[k].n / max) * 78) + '%' }), h('span', { class: 'v', text: by[k].n })));
+      hover(row, function (e) { showTip(e, by[k].n + ' findings', [{ text: k }].concat(SEV.filter(function (s) { return by[k].sev[s]; }).map(function (s) { return { color: sevVar(s), text: by[k].sev[s] + ' ' + s }; }))); });
+      return row;
+    })) : h('div', { class: 'empty', text: 'No active findings.' });
+    return h('div', { class: 'card' }, h('h2', null, 'Where the findings are', h('span', { class: 'sub', text: 'active findings per file' })), body);
+  }
+
+  function briefing() {
+    if (!D.agent) return null;
+    var a = D.agent;
+    return h('section', { class: 'card brief' },
+      h('h2', null, 'Agent briefing', h('span', { class: 'sub', text: (a.mode === 'llm' ? a.model : 'offline planner') + ' · ' + a.policy + ' · ' + a.toolCalls + ' tool calls' })),
+      h('p', { text: a.summary }),
+      (a.injections || []).length ? h('div', { class: 'warn' }, 'Prompt-injection attempt(s) detected and ignored: ', a.injections.map(function (i) { return i.source + ' (' + i.labels.join(', ') + ')'; }).join('; ')) : null,
+      (a.errors || []).length ? h('div', { class: 'who', text: a.errors.join(' · ') }) : null);
+  }
+
+  // ---------- findings table ----------
+  function visible() {
+    var q = state.q.toLowerCase();
+    return D.findings.filter(function (f) {
+      if (!state.showSuppressed && f.suppressed) return false;
+      if (!state.sev[f.severity]) return false;
+      if (state.cat && f.category !== state.cat) return false;
+      if (state.fixOnly && !(f.fix && f.fix.verified)) return false;
+      if (q && (f.id + ' ' + f.title + ' ' + f.ruleId + ' ' + f.location.file + ' ' + f.cwe.join(' ') + ' ' + f.owasp.join(' ')).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+
+  function diffPre(diff) {
+    var pre = h('pre', { class: 'mono' });
+    diff.replace(/\n$/, '').split('\n').forEach(function (l) {
+      var cls = l.indexOf('@@') === 0 ? 'hunk' : (l[0] === '+' && l.indexOf('+++') !== 0) ? 'add' : (l[0] === '-' && l.indexOf('---') !== 0) ? 'del' : null;
+      add(pre, h('span', { class: cls || undefined, style: cls ? undefined : 'display:block' , text: l || ' ' }));
+    });
+    return pre;
+  }
+
+  function detail(f) {
+    var links = f.cwe.map(function (c) { return h('a', { href: 'https://cwe.mitre.org/data/definitions/' + c.slice(4) + '.html', target: '_blank', rel: 'noopener noreferrer', text: c }); })
+      .concat(f.owasp.map(function (o) { var m = D.owasp.filter(function (x) { return x.id === o; })[0]; return h('a', { href: m ? m.url : '#', target: '_blank', rel: 'noopener noreferrer', text: o + (m ? ' ' + m.name : '') }); }));
+    var linkRow = h('p', null); links.forEach(function (l, i) { if (i) add(linkRow, ' · '); add(linkRow, l); });
+    return h('div', { class: 'det' },
+      h('div', null, h('h3', { text: 'What' }), h('p', { text: f.message }), linkRow,
+        f.package ? h('p', { class: 'mono', text: f.package.ecosystem + ' ' + f.package.name + '@' + f.package.version + (f.package.fixedIn ? ' → fixed in ' + f.package.fixedIn : '') + (f.package.dev ? ' (dev)' : '') + (f.package.direct === false ? ' (transitive)' : '') }) : null,
+        f.location.snippet && f.category !== 'dependency' ? h('pre', { class: 'mono', text: f.location.snippet }) : null),
+      h('div', null,
+        h('h3', { text: 'Triage' }),
+        h('p', null, 'Risk ', h('b', { text: String(f.risk == null ? '-' : f.risk) }), ' · ', f.priority || '', ' · confidence ', f.confidence, ' · ', f.scanner),
+        f.verdict ? h('p', null, h('b', { text: 'Agent: ' + f.verdict.status.replace(/_/g, ' ') + ' (' + f.verdict.confidence + ')' }), ' — ' + f.verdict.rationale, f.verdict.guardrail ? h('div', { class: 'warn', text: f.verdict.guardrail }) : null) : null,
+        (f.triageNotes || []).length ? h('ul', { class: 'notes' }, f.triageNotes.map(function (n) { return h('li', { text: n }); })) : null,
+        f.suppressed ? h('p', { class: 'pill', text: 'suppressed: ' + (f.suppressReason || '') }) : null,
+        !f.fix && f.remediation ? h('div', null, h('h3', { text: 'How to fix', style: 'margin-top:10px' }), h('p', { text: f.remediation })) : null),
+      f.fix ? h('div', { class: 'full' }, h('h3', null, 'Proposed fix · ' + f.fix.strategy + ' · ', h('span', { class: 'pill ' + (f.fix.verified ? 'ok' : 'bad'), text: f.fix.verified ? 'verified' : 'unverified' })),
+        h('p', { text: f.fix.description }), h('p', { class: 'meta', text: f.fix.verification || '' }), diffPre(f.fix.diff)) : null,
+      (f.references || []).length ? h('div', { class: 'full' }, h('h3', { text: 'References' }), h('p', null, f.references.slice(0, 5).map(function (r, i) { return [i ? ' · ' : '', /^https?:\/\//.test(r) ? h('a', { href: r, target: '_blank', rel: 'noopener noreferrer', text: r.replace(/^https?:\/\//, '').slice(0, 70) }) : r]; }))) : null);
+  }
+
+  function table() {
+    var rows = visible();
+    var tbody = h('tbody');
+    rows.forEach(function (f) {
+      var tr = h('tr', { class: 'row' + (f.suppressed ? ' sup' : ''), tabindex: '0', 'aria-expanded': state.open[f.id] ? 'true' : 'false' },
+        h('td', null, sevLabel(f.severity)),
+        h('td', { class: 'mono', text: f.id }),
+        h('td', null, h('span', { class: 'pill', text: f.priority || '-' })),
+        h('td', { class: 'num', text: f.risk == null ? '-' : f.risk }),
+        h('td', null, h('div', { text: f.title }), h('div', { class: 'meta mono', text: f.ruleId })),
+        h('td', { class: 'loc mono', text: f.location.file + ':' + f.location.line }),
+        h('td', { text: f.category }),
+        h('td', null, f.fix ? h('span', { class: 'pill ' + (f.fix.verified ? 'ok' : 'bad'), text: f.fix.verified ? '✓ fix' : 'fix?' }) : null));
+      var toggle = function () { state.open[f.id] = !state.open[f.id]; renderTable(); };
+      tr.addEventListener('click', toggle);
+      tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+      add(tbody, tr);
+      if (state.open[f.id]) add(tbody, h('tr', { class: 'detail' }, h('td', { colspan: '8' }, detail(f))));
+    });
+    return h('div', { class: 'tbl' }, rows.length ? h('table', null,
+      h('thead', null, h('tr', null, ['Severity', 'Id', 'Priority', 'Risk', 'Finding', 'Location', 'Category', 'Fix'].map(function (t, i) { return h('th', { text: t, style: i === 3 ? 'text-align:right' : undefined }); }))),
+      tbody) : h('div', { class: 'empty', text: 'No findings match these filters.' }));
+  }
+
+  function filters() {
+    var cats = ['sast', 'secret', 'dependency', 'config'];
+    return h('div', { class: 'filters', role: 'group', 'aria-label': 'Filter findings' },
+      SEV.map(function (s) {
+        return h('button', { class: 'chip', 'aria-pressed': state.sev[s] ? 'true' : 'false', onclick: function () { state.sev[s] = !state.sev[s]; renderAll(); } }, h('span', { class: 'dot', style: 'background:' + sevVar(s) }), s);
+      }),
+      h('select', { 'aria-label': 'Category', onchange: function (e) { state.cat = e.target.value; renderTable(); } },
+        [h('option', { value: '', text: 'All categories' })].concat(cats.map(function (c) { return h('option', { value: c, selected: state.cat === c, text: c }); }))),
+      h('label', { class: 'count' }, h('input', { type: 'checkbox', checked: state.fixOnly, onchange: function (e) { state.fixOnly = e.target.checked; renderTable(); } }), ' verified fix'),
+      h('label', { class: 'count' }, h('input', { type: 'checkbox', checked: state.showSuppressed, onchange: function (e) { state.showSuppressed = e.target.checked; renderTable(); } }), ' suppressed'),
+      h('span', { class: 'spacer' }),
+      h('input', { type: 'search', placeholder: 'Search id, rule, file, CWE…', value: state.q, 'aria-label': 'Search findings', oninput: function (e) { state.q = e.target.value; renderTable(); } }),
+      h('span', { class: 'count', id: 'count' }));
+  }
+
+  function scanners() {
+    return h('section', { class: 'card', style: 'margin-top:16px' }, h('h2', { text: 'Scanners' }),
+      h('table', { class: 'scanners' }, h('thead', null, h('tr', null, ['Scanner', 'Status', 'Findings', 'Time', 'Detail'].map(function (t) { return h('th', { text: t }); }))),
+        h('tbody', null, D.scan.scanners.map(function (s) {
+          return h('tr', null, h('td', { class: 'mono', text: s.name }), h('td', null, h('span', { class: 'pill ' + (s.status === 'ok' ? 'ok' : s.status === 'error' ? 'bad' : ''), text: s.status })),
+            h('td', { class: 'num', text: s.findings }), h('td', { class: 'num', text: s.durationMs + ' ms' }), h('td', { class: 'meta', text: s.detail || '' }));
+        }))));
+  }
+
+  // ---------- wiring ----------
+  var tableHost;
+  function renderTable() {
+    var n = visible().length;
+    var c = document.getElementById('count'); if (c) c.textContent = n + ' of ' + D.findings.length;
+    var t = table(); tableHost.replaceWith(t); tableHost = t;
+  }
+  function renderAll() {
+    var app = document.getElementById('app'); app.textContent = '';
+    tableHost = h('div');
+    add(app, [header(), overview(), briefing(), h('section', { class: 'grid g-two' }, heatmap(), filesChart()), filters(), tableHost, scanners(),
+      h('footer', null, h('span', { text: 'Generated by SentinelOps ' + D.version + ' at ' + fmtDate(D.generatedAt) + '. Self-contained: this file makes no network requests.' }),
+        h('span', { text: 'Severity colours are always paired with labels; every chart value is also in the table.' }))]);
+    renderTable();
+  }
+  function toggleTheme() { document.documentElement.setAttribute('data-theme', theme() === 'dark' ? 'light' : 'dark'); renderAll(); }
+  function download() {
+    var blob = new Blob([JSON.stringify(D, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sentinelops-' + D.scan.id.slice(0, 8) + '.json'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (!document.documentElement.getAttribute('data-theme')) renderAll(); });
+  renderAll();
+})();
+</script>
+</body>
+</html>
