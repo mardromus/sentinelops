@@ -23,7 +23,7 @@ interface Hit {
   key?: string;
 }
 
-function lineHits(line: string, file: SourceFile): Hit[] {
+export function lineHits(line: string, file: SourceFile): Hit[] {
   const hits: Hit[] = [];
   for (const p of PROVIDER_PATTERNS) {
     const m = p.re.exec(line);
