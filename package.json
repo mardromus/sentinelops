@@ -11,28 +11,35 @@
   "main": "dist/main.js",
   "files": [
     "dist",
-    "public"
+    "assets",
+    "action.yml",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/main.js",
-    "start:dev": "ts-node src/main.ts",
+    "start": "node dist/cli.js serve",
+    "start:dev": "ts-node src/cli.ts serve",
     "scan": "ts-node src/cli.ts scan",
     "test": "jest",
     "test:cov": "jest --coverage",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "demo": "ts-node src/cli.ts scan demo/vulnerable-shop --html out/report.html --sarif out/results.sarif --fix --out-dir out/fixed"
+    "demo": "ts-node src/cli.ts scan demo/vulnerable-shop --ai --no-osv --html out/report.html --sarif out/results.sarif --md out/summary.md --fix --out-dir out/fixed --exit-zero",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
+    "self-scan": "ts-node src/cli.ts scan . --exclude demo,test,out --no-osv --fail-on high",
+    "docs:rules": "ts-node src/cli.ts rules --markdown > docs/rules.md"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.0",
     "@nestjs/core": "^11.1.0",
     "@nestjs/platform-express": "^11.1.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "typescript": "~5.9.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -47,7 +54,6 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
-    "typescript": "~5.9.3",
     "typescript-eslint": "^8.18.0"
   },
   "jest": {
@@ -57,5 +63,21 @@
       "<rootDir>/test"
     ],
     "testTimeout": 30000
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mardromus/sentinelops.git"
+  },
+  "keywords": [
+    "devsecops",
+    "owasp",
+    "sast",
+    "sca",
+    "sarif",
+    "security",
+    "ai-agent",
+    "nestjs",
+    "osv",
+    "cwe"
+  ]
 }

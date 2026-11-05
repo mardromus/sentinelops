@@ -1,0 +1,75 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test -- --ci
+      - run: npm run build
+
+  self-scan:
+    name: sentinelops scans itself
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npm run build
+      - name: Gate on high findings in our own code
+        run: node dist/cli.js scan . --exclude demo,test,out --no-osv --fail-on high --sarif sentinelops.sarif --md self-scan.md
+      - if: always()
+        run: cat self-scan.md >> "$GITHUB_STEP_SUMMARY"
+
+  demo:
+    name: demo scan (vulnerable-shop)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npm run build
+      - name: Scan, review and fix the intentionally vulnerable demo
+        run: node dist/cli.js scan demo/vulnerable-shop --ai --no-osv --html out/report.html --sarif out/demo.sarif --md out/summary.md --fix --out-dir out/fixed --exit-zero
+      - name: The fixed copy must re-scan with fewer findings
+        run: |
+          node dist/cli.js scan out/fixed --no-osv --json out/rescan.json --exit-zero > /dev/null
+          node -e "const a=require('./out/rescan.json').summary.active; console.log('active after fixes:', a); process.exit(a < 30 ? 0 : 1)"
+      - run: cat out/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-report
+          path: out/
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t sentinelops:ci .
+      - run: docker run --rm sentinelops:ci scan demo/vulnerable-shop --no-osv --top 5 --exit-zero

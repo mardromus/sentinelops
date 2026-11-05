@@ -94,6 +94,18 @@ describe('builtin SAST rules', () => {
     expect(fs[0].suppressReason).toMatch(/inline/);
   });
 
+  it('only flags real NODE_TLS_REJECT_UNAUTHORIZED assignments', async () => {
+    const fs = await scan(
+      'tls.js',
+      [
+        "process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';",
+        "process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;",
+        "const msg = 'Removed the NODE_TLS_REJECT_UNAUTHORIZED=0 override';",
+      ].join('\n'),
+    );
+    expect(fs.map((f) => f.location.line)).toEqual([1, 2]);
+  });
+
   it('has python rules', async () => {
     const fs = await scan(
       'app.py',

@@ -202,7 +202,10 @@ export const RULES: Rule[] = [
     confidence: 'high',
     cwe: ['CWE-295'],
     languages: JS,
-    patterns: [/rejectUnauthorized\s*:\s*false/, /NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]?0/],
+    patterns: [
+      /rejectUnauthorized\s*:\s*false/,
+      /process\.env(\.NODE_TLS_REJECT_UNAUTHORIZED|\[\s*['"]NODE_TLS_REJECT_UNAUTHORIZED['"]\s*\])\s*=\s*['"]?0/,
+    ],
     message: 'Disabling certificate checks allows man-in-the-middle attacks.',
     remediation: 'Remove the override; trust a custom CA via the ca option if needed.',
     fixer: 'tls-verify',

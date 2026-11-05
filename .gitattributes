@@ -1,0 +1,3 @@
+# LF everywhere: fixers and tests compare exact text, and demo files must look the same on every OS
+* text=auto eol=lf
+*.png binary

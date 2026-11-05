@@ -1,0 +1,67 @@
+name: SentinelOps security review
+description: Scan code, dependencies, secrets and IaC against the OWASP Top 10, triage with an AI agent, verify fixes and report as SARIF + job summary.
+author: mardromus
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: Directory to scan
+    default: '.'
+  fail-on:
+    description: Fail the step when an active finding is at or above this severity (critical | high | medium | low)
+    default: high
+  sarif-file:
+    description: Where to write the SARIF report (upload it with github/codeql-action/upload-sarif)
+    default: sentinelops.sarif
+  html-file:
+    description: Where to write the self-contained HTML report
+    default: sentinelops-report.html
+  ai:
+    description: Run the agent review. Uses SENTINELOPS_LLM_API_KEY from env when set, otherwise the offline planner.
+    default: 'true'
+  autonomy:
+    description: Agent autonomy level 0-3 (the action never pushes; levels above 1 matter for the server mode)
+    default: '1'
+  osv:
+    description: Query OSV.dev for dependency advisories ('false' = offline snapshot)
+    default: 'true'
+
+outputs:
+  sarif-file:
+    description: Path of the SARIF report
+    value: ${{ inputs.sarif-file }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - name: Build SentinelOps
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci --no-audit --no-fund && npm run build
+    - name: Scan
+      shell: bash
+      # inputs travel through env, never interpolated into the script (see config.gha.script-injection)
+      env:
+        SO_PATH: ${{ inputs.path }}
+        SO_FAIL_ON: ${{ inputs.fail-on }}
+        SO_SARIF: ${{ inputs.sarif-file }}
+        SO_HTML: ${{ inputs.html-file }}
+        SO_AI: ${{ inputs.ai }}
+        SO_AUTONOMY: ${{ inputs.autonomy }}
+        SO_OSV: ${{ inputs.osv }}
+        SO_ACTION: ${{ github.action_path }}
+      run: |
+        args=(scan "$SO_PATH" --fail-on "$SO_FAIL_ON" --sarif "$SO_SARIF" --html "$SO_HTML" --md "$RUNNER_TEMP/sentinelops.md" --autonomy "$SO_AUTONOMY")
+        [ "$SO_AI" = "true" ] && args+=(--ai)
+        [ "$SO_OSV" = "false" ] && args+=(--no-osv)
+        set +e
+        node "$SO_ACTION/dist/cli.js" "${args[@]}"
+        code=$?
+        set -e
+        cat "$RUNNER_TEMP/sentinelops.md" >> "$GITHUB_STEP_SUMMARY"
+        exit $code

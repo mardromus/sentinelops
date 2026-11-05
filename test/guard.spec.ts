@@ -46,17 +46,24 @@ describe('path sandbox', () => {
   writeFileSync(join(root, 'src/app.js'), '');
   writeFileSync(join(root, '.env'), 'A=1');
   const outside = mkdtempSync(join(tmpdir(), 'so-out-'));
-  symlinkSync(outside, join(root, 'link'));
+  let links = true;
+  try {
+    symlinkSync(outside, join(root, 'link'), 'dir');
+  } catch {
+    links = false; // e.g. Windows without developer mode
+  }
   const sbx = new PathSandbox(root);
 
   it('allows repository files', () => {
     expect(sbx.check('src/app.js')).toBe('src/app.js');
     expect(sbx.check(join(root, 'src/app.js'))).toBe('src/app.js');
   });
+  (links ? it : it.skip)('blocks symlinks that leave the repository', () => {
+    expect(() => sbx.check('link/x')).toThrow(/symlink escapes/);
+  });
   it.each([
     '../../etc/passwd',
     '/etc/passwd',
-    'link/x',
     '.env',
     'config/.env.production',
     '.git/config',
