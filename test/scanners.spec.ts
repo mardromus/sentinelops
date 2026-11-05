@@ -5,7 +5,7 @@ import { Finding } from '../src/common/types';
 import { KnowledgeService } from '../src/knowledge/knowledge.service';
 import { ExternalScanner, parseGitleaks, parseSemgrep, parseTrivy } from '../src/scanners/external/external';
 import { makeFinding } from '../src/scanners/scanner';
-import { dedupe, ScannersService } from '../src/scanners/scanners.service';
+import { dedupe, disambiguate, ScannersService } from '../src/scanners/scanners.service';
 import { SastScanner } from '../src/scanners/sast/sast.scanner';
 
 describe('external adapters', () => {
@@ -64,6 +64,15 @@ describe('orchestration', () => {
     expect(out).toHaveLength(1);
     expect(out[0].scanner).toBe('builtin-sast');
     expect(out[0].triageNotes![0]).toContain('semgrep');
+  });
+
+  it('gives identical vulnerable lines in one file distinct identities', () => {
+    const mk = (line: number) =>
+      makeFinding({ ...base, location: { file: 'a.js', line, snippet: 'same()' }, ruleId: 'r', category: 'sast', severity: 'high', cwe: ['CWE-89'], scanner: 'builtin-sast' });
+    const out = disambiguate([mk(9), mk(3)]);
+    expect(new Set(out.map((f) => f.fingerprint)).size).toBe(2);
+    expect(out.find((f) => f.location.line === 3)!.fingerprint).toBe(mk(3).fingerprint);
+    expect(dedupe(out)).toHaveLength(2);
   });
 
   it('scans a directory end-to-end with enrichment, runs and skipped tools', async () => {

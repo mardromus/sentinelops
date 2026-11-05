@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { Finding, ScannerRun, ScanOptions, ScanResult, severityRank } from '../common/types';
@@ -7,7 +7,7 @@ import { ConfigScanner } from './config/config.scanner';
 import { DependencyScanner } from './deps/deps.scanner';
 import { OsvClient } from './deps/osv.client';
 import { ExternalScanner, externalScanners } from './external/external';
-import { loadFiles } from './files';
+import { loadFiles, shortId } from './files';
 import { SastScanner } from './sast/sast.scanner';
 import { Scanner } from './scanner';
 import { SecretsScanner } from './secrets/secrets.scanner';
@@ -16,6 +16,25 @@ export const SCANNERS = Symbol('SCANNERS');
 
 export function defaultScanners(): Scanner[] {
   return [new SastScanner(), new SecretsScanner(), new DependencyScanner(new OsvClient()), new ConfigScanner(), ...externalScanners()];
+}
+
+/**
+ * Identical vulnerable lines in one file would share a fingerprint. Give the
+ * 2nd, 3rd ... occurrence its own identity (stable while their order holds).
+ */
+export function disambiguate(findings: Finding[]): Finding[] {
+  const groups = new Map<string, Finding[]>();
+  for (const f of findings) groups.set(`${f.scanner}|${f.fingerprint}`, [...(groups.get(`${f.scanner}|${f.fingerprint}`) || []), f]);
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    g.sort((a, b) => a.location.line - b.location.line);
+    g.slice(1).forEach((f, i) => {
+      if (f.location.line === g[0].location.line) return;
+      f.fingerprint = createHash('sha256').update(`${f.fingerprint}#${i + 2}`).digest('hex');
+      f.id = shortId(f.fingerprint);
+    });
+  }
+  return findings;
 }
 
 /**
@@ -98,7 +117,7 @@ export class ScannersService {
       }),
     );
 
-    const findings = sortFindings(dedupe(all).map((f) => this.knowledge.enrich(f)));
+    const findings = sortFindings(dedupe(disambiguate(all)).map((f) => this.knowledge.enrich(f)));
     runs.sort((a, b) => this.list().indexOf(a.name) - this.list().indexOf(b.name));
     return {
       id: randomUUID(),
